@@ -4,7 +4,6 @@ from sqlalchemy.orm import Session
 from typing import List, Optional
 from datetime import datetime
 import numpy as np
-import cv2
 # Removed torch dependency
 
 import main
@@ -66,13 +65,9 @@ async def admin_register_new_cow(
     embeddings_data = []
     for idx, f in enumerate(files):
         contents = await f.read()
-        nparr = np.frombuffer(contents, np.uint8)
-        image = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
-        if image is None:
-            raise HTTPException(status_code=400, detail=f"Invalid nose print image: {f.filename}")
             
         # Detect nose using HF API
-        nose = main.detect_nose(image)
+        nose = main.detect_nose(contents)
         if nose is None:
             raise HTTPException(status_code=400, detail=f"No cow nose detected in {f.filename}")
         
@@ -442,13 +437,9 @@ async def admin_verify_cow_by_nose(
     results = []
     for f in files[:2]:  # Max 2 images
         contents = await f.read()
-        nparr = np.frombuffer(contents, np.uint8)
-        image = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
-        if image is None:
-            continue
             
         # Detect nose using HF API
-        nose = main.detect_nose(image)
+        nose = main.detect_nose(contents)
         if nose is None:
             continue
         

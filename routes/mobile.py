@@ -3,7 +3,6 @@ from fastapi import APIRouter, UploadFile, File, HTTPException, Depends, Form
 from sqlalchemy.orm import Session
 from typing import List
 import numpy as np
-import cv2
 # Removed torch dependency
 
 import main
@@ -34,13 +33,9 @@ async def verify_cow_by_nose(
     results = []
     for f in files[:2]:  # Max 2 images for mobile
         contents = await f.read()
-        nparr = np.frombuffer(contents, np.uint8)
-        image = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
-        if image is None:
-            continue
-            
+        
         # Detect nose using HF API
-        nose = main.detect_nose(image)
+        nose = main.detect_nose(contents)
         if nose is None:
             continue
         
@@ -207,14 +202,9 @@ async def verify_cow_live_camera(
 ):
     """Real-time verification from live camera feed"""
     contents = await file.read()
-    nparr = np.frombuffer(contents, np.uint8)
-    image = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
-    
-    if image is None:
-        raise HTTPException(status_code=400, detail="Invalid image frame")
         
     # Detect nose using HF API
-    nose = main.detect_nose(image)
+    nose = main.detect_nose(contents)
     if nose is None:
         return {
             "nose_detected": False,
