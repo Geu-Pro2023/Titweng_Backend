@@ -6,7 +6,6 @@ from datetime import datetime
 from typing import Optional, List, Dict, Any
 
 import numpy as np
-import cv2
 from PIL import Image
 # Removed torch dependencies - using HF APIs
 from fastapi import FastAPI, UploadFile, File, Form, BackgroundTasks, Depends, HTTPException
@@ -100,10 +99,8 @@ app.include_router(admin.router)
 # ---------------------------
 # Remove preprocess_image as it's no longer needed
 
-def extract_embedding(image: np.ndarray) -> np.ndarray:
+def extract_embedding(image_bytes: bytes) -> np.ndarray:
     try:
-        _, buffer = cv2.imencode('.jpg', image)
-        image_bytes = buffer.tobytes()
         embedding = ml_client.extract_embedding(image_bytes)
         if embedding is not None:
             return embedding
@@ -112,23 +109,15 @@ def extract_embedding(image: np.ndarray) -> np.ndarray:
         logger.error(f"Embedding extraction failed: {e}")
         raise HTTPException(status_code=503, detail="Embedding service unavailable")
 
-def detect_nose(image: np.ndarray) -> Optional[np.ndarray]:
+def detect_nose(image_bytes: bytes) -> Optional[bytes]:
     try:
-        _, buffer = cv2.imencode('.jpg', image)
-        image_bytes = buffer.tobytes()
         result = ml_client.detect_nose(image_bytes)
-        if result and 'bbox' in result:
-            x1, y1, x2, y2 = result['bbox']
-            return image[y1:y2, x1:x2]
-        # Fallback to center crop
-        h, w = image.shape[:2]
-        crop = min(h,w)//2
-        return image[h//2 - crop//2:h//2+crop//2, w//2 - crop//2:w//2+crop//2]
+        if result and 'cropped_image' in result:
+            return result['cropped_image']
+        return image_bytes  # Return original if no nose detected
     except Exception as e:
         logger.warning(f"Nose detection failed: {e}")
-        h, w = image.shape[:2]
-        crop = min(h,w)//2
-        return image[h//2 - crop//2:h//2+crop//2, w//2 - crop//2:w//2+crop//2]
+        return image_bytes
 
 # ---------------------------
 # QR & PDF

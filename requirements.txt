@@ -1,9 +1,9 @@
-fastapi==0.104.1
-uvicorn[standard]==0.24.0
-sqlalchemy==2.0.23
-psycopg2-binary==2.9.9
-python-multipart==0.0.6
-python-jose[cryptography]==3.3.0
+fastapi==0.68.0
+uvicorn[standard]==0.15.0
+sqlalchemy==1.4.23
+psycopg2-binary==2.9.1
+python-multipart==0.0.5
+python-jose[cryptography]==3.2.0
 passlib[bcrypt]==1.7.4
 bcrypt==4.1.2
 pillow==10.0.1
@@ -15,4 +15,4 @@ python-dotenv==1.0.0
 twilio==8.10.3
 pgvector==0.2.4
 gradio_client==0.7.3
-opencv-python-headless==4.8.1.78
+# opencv-python-headless==4.8.1.78
