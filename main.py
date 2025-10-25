@@ -296,7 +296,7 @@ def admin_login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = 
     return {"access_token": token, "token_type": "bearer"}
 
 # ---------------------------
-# Email Sending Function
+# Email Sending Functions
 # ---------------------------
 async def send_registration_email(to_email: str, owner_name: str, cow, pdf_path: str):
     """Send registration confirmation email with PDF attachment"""
