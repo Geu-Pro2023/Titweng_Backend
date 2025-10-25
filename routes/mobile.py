@@ -42,21 +42,27 @@ async def verify_cow_by_nose(
         # Extract embedding using HF API
         query_emb = main.extract_embedding(nose)
         
-        # Find best match across all cows
-        all_embeddings = db.query(Embedding).all()
-        best_match = None
-        best_similarity = 0
+        # Use pgvector for efficient similarity search
+        from sqlalchemy import text
         
-        for emb_record in all_embeddings:
-            stored_emb = np.array(emb_record.embedding)
-            cos_sim = np.dot(query_emb, stored_emb) / (np.linalg.norm(query_emb) * np.linalg.norm(stored_emb))
-            
-            if cos_sim > best_similarity:
-                best_similarity = cos_sim
-                best_match = emb_record.cow_id
+        # Convert embedding to string format for pgvector
+        emb_str = '[' + ','.join(map(str, query_emb.tolist())) + ']'
         
-        # Get cow details if match found (stricter threshold)
-        if best_similarity > 0.88:  # Much stricter threshold to prevent false positives
+        # Find most similar embedding using pgvector
+        query = text("""
+            SELECT cow_id, (1 - (embedding <=> :query_emb)) as similarity
+            FROM embeddings 
+            ORDER BY embedding <=> :query_emb 
+            LIMIT 1
+        """)
+        
+        result = db.execute(query, {"query_emb": emb_str}).fetchone()
+        
+        best_similarity = result.similarity if result else 0
+        best_match = result.cow_id if result else None
+        
+        # Ultra-strict threshold for 100k+ scale
+        if best_similarity > 0.95:
             cow = db.query(Cow).filter(Cow.cow_id == best_match).first()
             
             # Send SMS alert to owner (disabled until Twilio configured)
@@ -217,22 +223,27 @@ async def verify_cow_live_camera(
     # Extract embedding using HF API
     query_emb = main.extract_embedding(nose)
     
-    # Find best match across all cows
-    all_embeddings = db.query(Embedding).all()
-    best_match = None
-    best_similarity = 0
-    best_cow_id = None
+    # Use pgvector for efficient similarity search
+    from sqlalchemy import text
     
-    for emb_record in all_embeddings:
-        stored_emb = np.array(emb_record.embedding)
-        cos_sim = np.dot(query_emb, stored_emb) / (np.linalg.norm(query_emb) * np.linalg.norm(stored_emb))
-        
-        if cos_sim > best_similarity:
-            best_similarity = cos_sim
-            best_cow_id = emb_record.cow_id
+    # Convert embedding to string format for pgvector
+    emb_str = '[' + ','.join(map(str, query_emb.tolist())) + ']'
     
-    # Get cow details if match found (stricter threshold)
-    if best_similarity > 0.88:  # Much stricter threshold to prevent false positives
+    # Find most similar embedding using pgvector
+    query = text("""
+        SELECT cow_id, (1 - (embedding <=> :query_emb)) as similarity
+        FROM embeddings 
+        ORDER BY embedding <=> :query_emb 
+        LIMIT 1
+    """)
+    
+    result = db.execute(query, {"query_emb": emb_str}).fetchone()
+    
+    best_similarity = result.similarity if result else 0
+    best_cow_id = result.cow_id if result else None
+    
+    # Ultra-strict threshold for 100k+ scale
+    if best_similarity > 0.95:
         cow = db.query(Cow).filter(Cow.cow_id == best_cow_id).first()
         
         # Send SMS alert to owner (disabled until Twilio configured)

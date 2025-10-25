@@ -62,8 +62,9 @@ async def admin_register_new_cow(
     if len(files) != REGISTRATION_CONFIG["min_images"]:
         raise HTTPException(status_code=400, detail=f"Exactly {REGISTRATION_CONFIG['min_images']} nose print images required")
 
-    # Check for duplicate registration first
-    all_embeddings = db.query(Embedding).all()
+    # Check for duplicate registration using pgvector
+    from sqlalchemy import text
+    
     for idx, f in enumerate(files):
         contents = await f.read()
             
@@ -74,18 +75,26 @@ async def admin_register_new_cow(
         
         # Extract embedding for duplicate check
         emb = main.extract_embedding(nose)
+        emb_str = '[' + ','.join(map(str, emb.tolist())) + ']'
         
-        # Check if this cow is already registered (strict threshold)
-        for existing_emb in all_embeddings:
-            stored_emb = np.array(existing_emb.embedding)
-            similarity = np.dot(emb, stored_emb) / (np.linalg.norm(emb) * np.linalg.norm(stored_emb))
-            
-            if similarity > 0.90:  # Very strict threshold for duplicate detection
-                existing_cow = db.query(Cow).filter(Cow.cow_id == existing_emb.cow_id).first()
-                raise HTTPException(
-                    status_code=409, 
-                    detail=f"🚫 COW ALREADY REGISTERED! This cow is already in the system as {existing_cow.cow_tag} owned by {existing_cow.owner.full_name}. Registration similarity: {similarity:.3f}"
-                )
+        # Check for duplicates using pgvector (much faster)
+        query = text("""
+            SELECT e.cow_id, c.cow_tag, o.full_name, (1 - (e.embedding <=> :query_emb)) as similarity
+            FROM embeddings e
+            JOIN cows c ON e.cow_id = c.cow_id
+            JOIN owners o ON c.owner_id = o.owner_id
+            WHERE (1 - (e.embedding <=> :query_emb)) > 0.93
+            ORDER BY e.embedding <=> :query_emb
+            LIMIT 1
+        """)
+        
+        duplicate = db.execute(query, {"query_emb": emb_str}).fetchone()
+        
+        if duplicate:
+            raise HTTPException(
+                status_code=409, 
+                detail=f"🚫 COW ALREADY REGISTERED! This cow is already in the system as {duplicate.cow_tag} owned by {duplicate.full_name}. Similarity: {duplicate.similarity:.3f}"
+            )
     
     # Process nose print images if no duplicates found
     embeddings_data = []
@@ -464,23 +473,36 @@ async def admin_verify_cow_by_nose(
         # Extract embedding using HF API
         query_emb = main.extract_embedding(nose)
         
-        # Find best match across all cows
-        all_embeddings = db.query(Embedding).all()
+        # Use pgvector for efficient similarity search
+        from sqlalchemy import text
+        
+        # Convert embedding to string format for pgvector
+        emb_str = '[' + ','.join(map(str, query_emb.tolist())) + ']'
+        
+        # Find top 3 most similar embeddings using pgvector
+        query = text("""
+            SELECT cow_id, embedding <=> :query_emb as distance
+            FROM embeddings 
+            ORDER BY embedding <=> :query_emb 
+            LIMIT 3
+        """)
+        
+        results = db.execute(query, {"query_emb": emb_str}).fetchall()
+        
         best_similarity = 0
         best_cow_id = None
         
-        for emb_record in all_embeddings:
-            stored_emb = np.array(emb_record.embedding)
-            cos_sim = np.dot(query_emb, stored_emb) / (np.linalg.norm(query_emb) * np.linalg.norm(stored_emb))
-            
-            if cos_sim > best_similarity:
-                best_similarity = cos_sim
-                best_cow_id = emb_record.cow_id
+        # Convert distance to similarity and find best match
+        for row in results:
+            similarity = 1 - row.distance  # Convert distance to similarity
+            if similarity > best_similarity:
+                best_similarity = similarity
+                best_cow_id = row.cow_id
         
-        # Get cow details if match found (stricter threshold)
-        if best_similarity > 0.88:  # Much stricter threshold
+        # Require VERY high similarity for 100k+ scale (95%+)
+        if best_similarity > 0.95:  # Ultra-strict threshold for large scale
             cow = db.query(Cow).filter(Cow.cow_id == best_cow_id).first()
-            verified_status = "yes" if best_similarity > 0.92 else "partial"
+            verified_status = "yes" if best_similarity > 0.97 else "partial"
             
             # Log verification
             log = VerificationLog(
