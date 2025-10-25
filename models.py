@@ -53,7 +53,7 @@ class Embedding(Base):
     embedding = Column(Vector(256))  # Changed from 512 to 256
     image_angle = Column(String(20))  # 'front', 'left', 'right'
     quality_score = Column(Float)  # Image quality 0-1
-    is_primary = Column(String(5), default="no")  # Mark best embedding
+    is_primary = Column(String(10), default="no")  # Mark best embedding
     created_at = Column(TIMESTAMP, server_default=func.now())
 
     cow = relationship("Cow", back_populates="embeddings")
@@ -83,7 +83,7 @@ class VerificationLog(Base):
     verification_image = Column(Text)
     similarity_score = Column(Float)
     location = Column(Text)
-    verified = Column(String(5))
+    verified = Column(String(20))
     created_at = Column(TIMESTAMP, server_default=func.now())
 
     user = relationship("User")
