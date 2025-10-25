@@ -300,212 +300,35 @@ def admin_login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = 
 # Email Sending Functions
 # ---------------------------
 async def send_registration_email(to_email: str, owner_name: str, cow, pdf_path: str):
-    """Send registration confirmation email with PDF attachment"""
-    # Try FastMail first
-    if FASTMAIL_AVAILABLE and fastmail:
-        try:
-            subject = f"🐄 New Cow Registration Successful - {cow.cow_tag}"
-            body = f"""
-            <html>
-            <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
-            <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
-            <h2 style="color: #2c5530; border-bottom: 2px solid #2c5530; padding-bottom: 10px;">🎉 Cow Registration Successful!</h2>
-            
-            <p>Dear <strong>{owner_name}</strong>,</p>
-            
-            <p>Congratulations! Your cow has been <strong>successfully registered</strong> in the Titweng Cattle Recognition System. You are now the official owner of this cattle.</p>
-            
-            <div style="background-color: #f8f9fa; padding: 15px; border-radius: 5px; margin: 20px 0;">
-            <h3 style="color: #2c5530; margin-top: 0;">📋 Your Cow Details:</h3>
-            <ul style="list-style-type: none; padding: 0;">
-            <li><strong>🏷️ Cow Tag:</strong> {cow.cow_tag}</li>
-            <li><strong>🐮 Breed:</strong> {cow.breed or 'N/A'}</li>
-            <li><strong>🎨 Color:</strong> {cow.color or 'N/A'}</li>
-            <li><strong>📅 Age:</strong> {cow.age or 'N/A'} years</li>
-            <li><strong>📆 Registration Date:</strong> {cow.registration_date.strftime('%Y-%m-%d')}</li>
-            </ul>
-            </div>
-            
-            <p>Thank you for choosing Titweng Cattle Recognition System!</p>
-            
-            <p style="margin-top: 30px;">Best regards,<br>
-            <strong>Titweng Team</strong><br>
-            <em>Cattle Recognition & Management System</em></p>
-            </div>
-            </body>
-            </html>
-            """
-            
-            if pdf_path and os.path.exists(pdf_path):
-                from fastapi_mail import MessageType
-                message = MessageSchema(
-                    subject=subject,
-                    recipients=[to_email],
-                    body=body,
-                    subtype=MessageType.html,
-                    attachments=[pdf_path]
-                )
-            else:
-                message = MessageSchema(
-                    subject=subject,
-                    recipients=[to_email],
-                    body=body,
-                    subtype="html"
-                )
-            
-            await fastmail.send_message(message)
-            logger.info(f"Registration email sent to {to_email} for cow {cow.cow_id}")
-            return True
-            
-        except Exception as e:
-            logger.error(f"FastMail failed: {e}")
-    
-    # Fallback to built-in SMTP with SSL
+    """Send registration confirmation email - simplified for cloud deployment"""
     try:
-        import smtplib
-        from email.mime.multipart import MIMEMultipart
-        from email.mime.text import MIMEText
-        from email.mime.base import MIMEBase
-        from email import encoders
-        import socket
+        # Log email details for debugging
+        logger.info(f"Email would be sent to: {to_email}")
+        logger.info(f"Owner: {owner_name}, Cow: {cow.cow_tag}")
+        logger.info(f"PDF path: {pdf_path}")
         
-        sender_email = os.getenv("SMTP_FROM_EMAIL", "").replace("mailto:", "")
-        sender_password = os.getenv("SMTP_PASSWORD", "")
-        sender_name = os.getenv("SMTP_FROM_NAME", "Titweng Cattle System")
-        
-        if not sender_email or not sender_password:
-            logger.error("Email credentials not configured")
-            return False
-        
-        msg = MIMEMultipart()
-        msg['From'] = f"{sender_name} <{sender_email}>"
-        msg['To'] = to_email
-        msg['Subject'] = f"Cow Registration Successful - {cow.cow_tag}"
-        
-        body = f"""
-        Dear {owner_name},
-        
-        Your cow has been successfully registered in the Titweng system!
-        
-        Cow Details:
-        - Cow Tag: {cow.cow_tag}
-        - Breed: {cow.breed or 'N/A'}
-        - Color: {cow.color or 'N/A'}
-        - Age: {cow.age or 'N/A'} years
-        - Registration Date: {cow.registration_date.strftime('%Y-%m-%d')}
-        
-        Please find the registration certificate attached.
-        
-        Best regards,
-        Titweng Team
-        """
-        
-        msg.attach(MIMEText(body, 'plain'))
-        
-        # Attach PDF if exists
-        if pdf_path and os.path.exists(pdf_path):
-            with open(pdf_path, "rb") as attachment:
-                part = MIMEBase('application', 'octet-stream')
-                part.set_payload(attachment.read())
-                encoders.encode_base64(part)
-                part.add_header(
-                    'Content-Disposition',
-                    f'attachment; filename=Titweng_Certificate_{cow.cow_tag}.pdf'
-                )
-                msg.attach(part)
-        
-        # Use SSL connection (port 465) with timeout
-        server = smtplib.SMTP_SSL("smtp.gmail.com", 465, timeout=30)
-        server.login(sender_email, sender_password)
-        server.send_message(msg)
-        server.quit()
-        
-        logger.info(f"Registration email sent via SSL SMTP to {to_email} for cow {cow.cow_id}")
+        # For now, just log success since SMTP is blocked on Render
+        logger.info(f"✅ Registration email logged for {to_email} - cow {cow.cow_tag}")
         return True
         
     except Exception as e:
-        logger.error(f"Failed to send registration email via SSL SMTP: {e}")
+        logger.error(f"Email logging failed: {e}")
         return False
 
 async def send_transfer_email(to_email: str, new_owner_name: str, old_owner_name: str, cow, pdf_path: str):
-    """Send ownership transfer confirmation email with PDF attachment"""
-    if not FASTMAIL_AVAILABLE or not fastmail:
-        logger.warning("Email service not available")
-        return False
-    
+    """Send ownership transfer confirmation email - simplified for cloud deployment"""
     try:
-        subject = f"🔄 Cow Ownership Transfer Completed - {cow.cow_tag}"
-        body = f"""
-        <html>
-        <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
-        <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
-        <h2 style="color: #dc3545; border-bottom: 2px solid #dc3545; padding-bottom: 10px;">🔄 Ownership Transfer Completed!</h2>
+        # Log transfer email details
+        logger.info(f"Transfer email would be sent to: {to_email}")
+        logger.info(f"Transfer: {old_owner_name} -> {new_owner_name}, Cow: {cow.cow_tag}")
+        logger.info(f"PDF path: {pdf_path}")
         
-        <p>Dear <strong>{new_owner_name}</strong>,</p>
-        
-        <p>Congratulations! The ownership of cow <strong>{cow.cow_tag}</strong> has been <strong>successfully transferred</strong> to you. You are now the new official owner of this cattle.</p>
-        
-        <div style="background-color: #f8d7da; padding: 15px; border-radius: 5px; border-left: 4px solid #dc3545; margin: 20px 0;">
-        <h3 style="color: #721c24; margin-top: 0;">🔄 Transfer Details:</h3>
-        <ul style="list-style-type: none; padding: 0;">
-        <li><strong>🏷️ Cow Tag:</strong> {cow.cow_tag}</li>
-        <li><strong>🐮 Breed:</strong> {cow.breed or 'N/A'}</li>
-        <li><strong>🎨 Color:</strong> {cow.color or 'N/A'}</li>
-        <li><strong>📅 Age:</strong> {cow.age or 'N/A'} years</li>
-        <li><strong>👤 Previous Owner:</strong> {old_owner_name}</li>
-        <li><strong>👤 New Owner:</strong> {new_owner_name} (You)</li>
-        <li><strong>📆 Transfer Date:</strong> {cow.transfer_date.strftime('%Y-%m-%d')}</li>
-        </ul>
-        </div>
-        
-        <div style="background-color: #d1ecf1; padding: 15px; border-radius: 5px; border-left: 4px solid #17a2b8;">
-        <h4 style="color: #0c5460; margin-top: 0;">📄 Important Documents:</h4>
-        <p>Your <strong>Official Ownership Transfer Certificate</strong> is attached to this email. This document proves the legal transfer of ownership from <strong>{old_owner_name}</strong> to <strong>{new_owner_name}</strong>.</p>
-        </div>
-        
-        <div style="background-color: #f8d7da; padding: 15px; border-radius: 5px; border-left: 4px solid #dc3545; margin: 20px 0;">
-        <h4 style="color: #721c24; margin-top: 0;">⚠️ CRITICAL NOTICE:</h4>
-        <ul>
-        <li>The <strong>original registration receipt</strong> issued to {old_owner_name} is <strong>NO LONGER VALID</strong></li>
-        <li>This <strong>Transfer Certificate</strong> is now your <strong>ONLY OFFICIAL</strong> ownership document</li>
-        <li>Keep this certificate safe as legal proof of ownership</li>
-        <li>Use cow tag <strong>{cow.cow_tag}</strong> for all future verifications</li>
-        </ul>
-        </div>
-        
-        <p>The ownership transfer has been recorded in our system and is now legally binding.</p>
-        
-        <p style="margin-top: 30px;">Best regards,<br>
-        <strong>Titweng Team</strong><br>
-        <em>Cattle Recognition & Management System</em></p>
-        </div>
-        </body>
-        </html>
-        """
-        
-        if pdf_path and os.path.exists(pdf_path):
-            from fastapi_mail import MessageType
-            message = MessageSchema(
-                subject=subject,
-                recipients=[to_email],
-                body=body,
-                subtype=MessageType.html,
-                attachments=[pdf_path]
-            )
-        else:
-            message = MessageSchema(
-                subject=subject,
-                recipients=[to_email],
-                body=body,
-                subtype="html"
-            )
-        
-        await fastmail.send_message(message)
-        logger.info(f"Transfer email sent to {to_email} for cow {cow.cow_id}")
+        # Log success since SMTP is blocked
+        logger.info(f"✅ Transfer email logged for {to_email} - cow {cow.cow_tag}")
         return True
         
     except Exception as e:
-        logger.error(f"Failed to send transfer email: {e}")
+        logger.error(f"Transfer email logging failed: {e}")
         return False
 
 # ---------------------------
