@@ -90,13 +90,23 @@ def generate_transfer_receipt_pdf(cow_data: Dict[str,Any], old_owner_data: Dict[
         subtitle_width = c.stringWidth(subtitle, "Helvetica", 12)
         c.drawString((width - subtitle_width) / 2, height-150, subtitle)
         
+        # Transfer Notice (centered and prominent)
+        c.setFont("Helvetica-Bold", 14)
+        c.setFillColor(colors.darkred)
+        transfer_notice = f"OWNERSHIP TRANSFERRED FROM {old_owner_data.get('full_name', 'N/A').upper()} TO {new_owner_data.get('full_name', 'N/A').upper()}"
+        notice_width = c.stringWidth(transfer_notice, "Helvetica-Bold", 14)
+        if notice_width > width - 80:  # If too long, use smaller font
+            c.setFont("Helvetica-Bold", 12)
+            notice_width = c.stringWidth(transfer_notice, "Helvetica-Bold", 12)
+        c.drawString((width - notice_width) / 2, height-175, transfer_notice)
+        
         # Border
         c.setStrokeColor(colors.darkred)
         c.setLineWidth(2)
         c.rect(40, 40, width-80, height-80)
         
         # Transfer Information
-        y = height - 200
+        y = height - 220
         c.setFont("Helvetica-Bold", 14)
         c.setFillColor(colors.darkred)
         c.drawString(60, y, "OWNERSHIP TRANSFER DETAILS")
@@ -191,6 +201,14 @@ def generate_transfer_receipt_pdf(cow_data: Dict[str,Any], old_owner_data: Dict[
         c.drawString(60, 60, cert_info)
         c.drawString(60, 50, f"Generated on: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
         
+        # Important notice
+        c.setFont("Helvetica-Bold", 9)
+        c.setFillColor(colors.darkred)
+        c.drawString(60, 80, "IMPORTANT: Original registration receipt is NO LONGER VALID")
+        c.setFont("Helvetica", 8)
+        c.setFillColor(colors.grey)
+        c.drawString(60, 70, "This transfer certificate is the ONLY valid ownership document")
+        
         c.save()
         return save_path
     return None
@@ -221,9 +239,16 @@ def generate_receipt_pdf(cow_data: Dict[str,Any], owner_data: Dict[str,Any], qr_
         # Subtitle
         c.setFont("Helvetica", 12)
         c.setFillColor(colors.black)
-        subtitle = "Official Registration Document"
+        subtitle = "Official Registration Document - Original Owner"
         subtitle_width = c.stringWidth(subtitle, "Helvetica", 12)
         c.drawString((width - subtitle_width) / 2, height-150, subtitle)
+        
+        # Registration Notice (centered)
+        c.setFont("Helvetica-Bold", 14)
+        c.setFillColor(colors.darkblue)
+        reg_notice = f"REGISTERED TO: {owner_data.get('full_name', 'N/A').upper()}"
+        notice_width = c.stringWidth(reg_notice, "Helvetica-Bold", 14)
+        c.drawString((width - notice_width) / 2, height-175, reg_notice)
         
         # Border
         c.setStrokeColor(colors.darkblue)
@@ -231,7 +256,7 @@ def generate_receipt_pdf(cow_data: Dict[str,Any], owner_data: Dict[str,Any], qr_
         c.rect(40, 40, width-80, height-80)
         
         # Cow Information Section
-        y = height - 200
+        y = height - 220
         c.setFont("Helvetica-Bold", 14)
         c.setFillColor(colors.darkblue)
         c.drawString(60, y, "CATTLE INFORMATION")

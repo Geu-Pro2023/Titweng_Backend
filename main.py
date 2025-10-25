@@ -34,7 +34,7 @@ except Exception:
     QR_AVAILABLE = False
 
 try:
-    from fastapi_mail import FastMail
+    from fastapi_mail import FastMail, MessageSchema, ConnectionConfig
     FASTMAIL_AVAILABLE = True
 except Exception:
     FASTMAIL_AVAILABLE = False
@@ -167,6 +167,51 @@ def detect_nose(image_bytes: bytes) -> Optional[bytes]:
         return image_bytes
 
 # ---------------------------
+# Email Configuration
+# ---------------------------
+mail_config = ConnectionConfig(
+    MAIL_USERNAME=os.getenv("SENDER_EMAIL", "geu.bior@gmail.com"),
+    MAIL_PASSWORD=os.getenv("SENDER_PASSWORD", ""),
+    MAIL_FROM=os.getenv("SENDER_EMAIL", "geu.bior@gmail.com"),
+    MAIL_PORT=int(os.getenv("SMTP_PORT", "587")),
+    MAIL_SERVER=os.getenv("SMTP_SERVER", "smtp.gmail.com"),
+    MAIL_FROM_NAME=os.getenv("SENDER_NAME", "Titweng Cattle System"),
+    MAIL_STARTTLS=True,
+    MAIL_SSL_TLS=False,
+    USE_CREDENTIALS=True
+)
+
+fastmail = FastMail(mail_config) if FASTMAIL_AVAILABLE else None
+
+async def send_email(recipient_email: str, subject: str, body: str, pdf_path: Optional[str] = None):
+    if not FASTMAIL_AVAILABLE or not fastmail:
+        logger.warning("Email service not available")
+        return False
+    
+    try:
+        message = MessageSchema(
+            subject=subject,
+            recipients=[recipient_email],
+            body=body,
+            subtype="html"
+        )
+        
+        if pdf_path and os.path.exists(pdf_path):
+            with open(pdf_path, "rb") as f:
+                message.attachments = [{
+                    "file": f.read(),
+                    "filename": "registration_receipt.pdf",
+                    "content_type": "application/pdf"
+                }]
+        
+        await fastmail.send_message(message)
+        logger.info(f"Email sent successfully to {recipient_email}")
+        return True
+    except Exception as e:
+        logger.error(f"Failed to send email to {recipient_email}: {e}")
+        return False
+
+# ---------------------------
 # QR & PDF
 # ---------------------------
 def generate_qr_code(data:str, save_path:str):
@@ -251,6 +296,164 @@ def admin_login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = 
     return {"access_token": token, "token_type": "bearer"}
 
 # ---------------------------
+# Email Sending Function
+# ---------------------------
+async def send_registration_email(to_email: str, owner_name: str, cow, pdf_path: str):
+    """Send registration confirmation email with PDF attachment"""
+    if not FASTMAIL_AVAILABLE or not fastmail:
+        logger.warning("Email service not available")
+        return False
+    
+    try:
+        subject = f"🐄 New Cow Registration Successful - {cow.cow_tag}"
+        body = f"""
+        <html>
+        <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+        <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
+        <h2 style="color: #2c5530; border-bottom: 2px solid #2c5530; padding-bottom: 10px;">🎉 Cow Registration Successful!</h2>
+        
+        <p>Dear <strong>{owner_name}</strong>,</p>
+        
+        <p>Congratulations! Your cow has been <strong>successfully registered</strong> in the Titweng Cattle Recognition System. You are now the official owner of this cattle.</p>
+        
+        <div style="background-color: #f8f9fa; padding: 15px; border-radius: 5px; margin: 20px 0;">
+        <h3 style="color: #2c5530; margin-top: 0;">📋 Your Cow Details:</h3>
+        <ul style="list-style-type: none; padding: 0;">
+        <li><strong>🏷️ Cow Tag:</strong> {cow.cow_tag}</li>
+        <li><strong>🐮 Breed:</strong> {cow.breed or 'N/A'}</li>
+        <li><strong>🎨 Color:</strong> {cow.color or 'N/A'}</li>
+        <li><strong>📅 Age:</strong> {cow.age or 'N/A'} years</li>
+        <li><strong>📆 Registration Date:</strong> {cow.registration_date.strftime('%Y-%m-%d')}</li>
+        </ul>
+        </div>
+        
+        <div style="background-color: #e8f5e8; padding: 15px; border-radius: 5px; border-left: 4px solid #28a745;">
+        <h4 style="color: #155724; margin-top: 0;">📄 Important Documents:</h4>
+        <p>Your <strong>Official Registration Certificate</strong> is attached to this email. Please keep this document safe as proof of ownership.</p>
+        </div>
+        
+        <div style="background-color: #fff3cd; padding: 15px; border-radius: 5px; border-left: 4px solid #ffc107; margin: 20px 0;">
+        <h4 style="color: #856404; margin-top: 0;">📱 Next Steps:</h4>
+        <ul>
+        <li>Save the attached certificate in a safe place</li>
+        <li>Use the cow tag <strong>{cow.cow_tag}</strong> for all future verifications</li>
+        <li>Contact us if you need to transfer ownership in the future</li>
+        </ul>
+        </div>
+        
+        <p>Thank you for choosing Titweng Cattle Recognition System!</p>
+        
+        <p style="margin-top: 30px;">Best regards,<br>
+        <strong>Titweng Team</strong><br>
+        <em>Cattle Recognition & Management System</em></p>
+        </div>
+        </body>
+        </html>
+        """
+        
+        message = MessageSchema(
+            subject=subject,
+            recipients=[to_email],
+            body=body,
+            subtype="html"
+        )
+        
+        if pdf_path and os.path.exists(pdf_path):
+            with open(pdf_path, "rb") as f:
+                message.attachments = [{
+                    "file": f.read(),
+                    "filename": f"Titweng_Registration_Certificate_{cow.cow_tag}.pdf",
+                    "content_type": "application/pdf"
+                }]
+        
+        await fastmail.send_message(message)
+        logger.info(f"Registration email sent to {to_email} for cow {cow.cow_id}")
+        return True
+        
+    except Exception as e:
+        logger.error(f"Failed to send registration email: {e}")
+        return False
+
+async def send_transfer_email(to_email: str, new_owner_name: str, old_owner_name: str, cow, pdf_path: str):
+    """Send ownership transfer confirmation email with PDF attachment"""
+    if not FASTMAIL_AVAILABLE or not fastmail:
+        logger.warning("Email service not available")
+        return False
+    
+    try:
+        subject = f"🔄 Cow Ownership Transfer Completed - {cow.cow_tag}"
+        body = f"""
+        <html>
+        <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+        <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
+        <h2 style="color: #dc3545; border-bottom: 2px solid #dc3545; padding-bottom: 10px;">🔄 Ownership Transfer Completed!</h2>
+        
+        <p>Dear <strong>{new_owner_name}</strong>,</p>
+        
+        <p>Congratulations! The ownership of cow <strong>{cow.cow_tag}</strong> has been <strong>successfully transferred</strong> to you. You are now the new official owner of this cattle.</p>
+        
+        <div style="background-color: #f8d7da; padding: 15px; border-radius: 5px; border-left: 4px solid #dc3545; margin: 20px 0;">
+        <h3 style="color: #721c24; margin-top: 0;">🔄 Transfer Details:</h3>
+        <ul style="list-style-type: none; padding: 0;">
+        <li><strong>🏷️ Cow Tag:</strong> {cow.cow_tag}</li>
+        <li><strong>🐮 Breed:</strong> {cow.breed or 'N/A'}</li>
+        <li><strong>🎨 Color:</strong> {cow.color or 'N/A'}</li>
+        <li><strong>📅 Age:</strong> {cow.age or 'N/A'} years</li>
+        <li><strong>👤 Previous Owner:</strong> {old_owner_name}</li>
+        <li><strong>👤 New Owner:</strong> {new_owner_name} (You)</li>
+        <li><strong>📆 Transfer Date:</strong> {cow.transfer_date.strftime('%Y-%m-%d')}</li>
+        </ul>
+        </div>
+        
+        <div style="background-color: #d1ecf1; padding: 15px; border-radius: 5px; border-left: 4px solid #17a2b8;">
+        <h4 style="color: #0c5460; margin-top: 0;">📄 Important Documents:</h4>
+        <p>Your <strong>Official Ownership Transfer Certificate</strong> is attached to this email. This document proves the legal transfer of ownership from <strong>{old_owner_name}</strong> to <strong>{new_owner_name}</strong>.</p>
+        </div>
+        
+        <div style="background-color: #f8d7da; padding: 15px; border-radius: 5px; border-left: 4px solid #dc3545; margin: 20px 0;">
+        <h4 style="color: #721c24; margin-top: 0;">⚠️ CRITICAL NOTICE:</h4>
+        <ul>
+        <li>The <strong>original registration receipt</strong> issued to {old_owner_name} is <strong>NO LONGER VALID</strong></li>
+        <li>This <strong>Transfer Certificate</strong> is now your <strong>ONLY OFFICIAL</strong> ownership document</li>
+        <li>Keep this certificate safe as legal proof of ownership</li>
+        <li>Use cow tag <strong>{cow.cow_tag}</strong> for all future verifications</li>
+        </ul>
+        </div>
+        
+        <p>The ownership transfer has been recorded in our system and is now legally binding.</p>
+        
+        <p style="margin-top: 30px;">Best regards,<br>
+        <strong>Titweng Team</strong><br>
+        <em>Cattle Recognition & Management System</em></p>
+        </div>
+        </body>
+        </html>
+        """
+        
+        message = MessageSchema(
+            subject=subject,
+            recipients=[to_email],
+            body=body,
+            subtype="html"
+        )
+        
+        if pdf_path and os.path.exists(pdf_path):
+            with open(pdf_path, "rb") as f:
+                message.attachments = [{
+                    "file": f.read(),
+                    "filename": f"Titweng_Transfer_Certificate_{cow.cow_tag}_from_{old_owner_name.replace(' ', '_')}_to_{new_owner_name.replace(' ', '_')}.pdf",
+                    "content_type": "application/pdf"
+                }]
+        
+        await fastmail.send_message(message)
+        logger.info(f"Transfer email sent to {to_email} for cow {cow.cow_id}")
+        return True
+        
+    except Exception as e:
+        logger.error(f"Failed to send transfer email: {e}")
+        return False
+
+# ---------------------------
 # Health Check
 # ---------------------------
 @app.get("/health")
@@ -259,6 +462,7 @@ def health_check():
         "status": "healthy",
         "yolo_loaded": True,
         "siamese_loaded": True,
+        "email_available": FASTMAIL_AVAILABLE,
         "endpoints": {
             "admin": "/admin/*",
             "mobile": "/mobile/*"

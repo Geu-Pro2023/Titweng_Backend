@@ -10,7 +10,7 @@ import main
 from database import get_db
 from models import Cow, Embedding, Owner, VerificationLog, Report
 from auth import get_current_admin
-from utils import generate_qr_code, generate_receipt_pdf, generate_transfer_receipt_pdf, send_registration_email, send_transfer_email, QR_AVAILABLE
+from utils import generate_qr_code, generate_receipt_pdf, generate_transfer_receipt_pdf, QR_AVAILABLE
 from cow_tag_generator import generate_secure_cow_tag
 
 router = APIRouter(
@@ -146,7 +146,7 @@ async def admin_register_new_cow(
         
         # Send email in background if owner has email
         if owner.email:
-            background_tasks.add_task(send_registration_email, owner.email, owner.full_name, cow, pdf_path)
+            background_tasks.add_task(main.send_registration_email, owner.email, owner.full_name, cow, pdf_path)
 
     return {
         "success": True,
@@ -298,7 +298,7 @@ async def admin_transfer_ownership(
         db.commit()
         
         # Send email to new owner
-        background_tasks.add_task(send_transfer_email, new_owner.email, new_owner.full_name, old_owner.full_name, cow, transfer_pdf_path)
+        background_tasks.add_task(main.send_transfer_email, new_owner.email, new_owner.full_name, old_owner.full_name, cow, transfer_pdf_path)
     
     return {
         "success": True,
