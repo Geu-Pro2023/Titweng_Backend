@@ -77,9 +77,11 @@ async def lifespan(app: FastAPI):
         from models import Base, User
         import bcrypt
         
-        # Create all tables
-        Base.metadata.create_all(bind=engine)
-        logger.info("✅ Database tables created")
+        # Create all tables with detailed logging
+        logger.info("Creating database tables...")
+        Base.metadata.drop_all(bind=engine)  # Drop existing tables
+        Base.metadata.create_all(bind=engine)  # Create fresh tables
+        logger.info("✅ Database tables created successfully")
         
         # Create admin user if not exists
         db = SessionLocal()
@@ -94,7 +96,8 @@ async def lifespan(app: FastAPI):
                 username=admin_username,
                 email=admin_email,
                 password_hash=password_hash,
-                role="admin"
+                role="admin",
+                user_type="admin"
             )
             db.add(admin)
             db.commit()
@@ -105,6 +108,8 @@ async def lifespan(app: FastAPI):
         
     except Exception as e:
         logger.error(f"Database setup error: {e}")
+        logger.error(f"Database URL: {os.getenv('DATABASE_URL', 'Not set')}")
+        # Continue without database setup - will fail on first request
     
     logger.info("✅ Using Hugging Face models")
     yield
