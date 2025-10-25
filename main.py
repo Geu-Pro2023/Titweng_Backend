@@ -169,12 +169,12 @@ def detect_nose(image_bytes: bytes) -> Optional[bytes]:
 # Email Configuration
 # ---------------------------
 mail_config = ConnectionConfig(
-    MAIL_USERNAME=os.getenv("SENDER_EMAIL", "geu.bior@gmail.com"),
-    MAIL_PASSWORD=os.getenv("SENDER_PASSWORD", ""),
-    MAIL_FROM=os.getenv("SENDER_EMAIL", "geu.bior@gmail.com"),
+    MAIL_USERNAME=os.getenv("SMTP_USERNAME", "g.bior@alustudent.com").replace("mailto:", ""),
+    MAIL_PASSWORD=os.getenv("SMTP_PASSWORD", ""),
+    MAIL_FROM=os.getenv("SMTP_FROM_EMAIL", "g.bior@alustudent.com").replace("mailto:", ""),
     MAIL_PORT=int(os.getenv("SMTP_PORT", "587")),
     MAIL_SERVER=os.getenv("SMTP_SERVER", "smtp.gmail.com"),
-    MAIL_FROM_NAME=os.getenv("SENDER_NAME", "Titweng Cattle System"),
+    MAIL_FROM_NAME=os.getenv("SMTP_FROM_NAME", "Titweng Cattle System"),
     MAIL_STARTTLS=True,
     MAIL_SSL_TLS=False,
     USE_CREDENTIALS=True
@@ -480,11 +480,11 @@ def test_email_config():
     """Test email configuration and credentials"""
     config_status = {
         "fastmail_available": FASTMAIL_AVAILABLE,
-        "sender_email": os.getenv("SENDER_EMAIL", "NOT_SET"),
-        "sender_password_set": bool(os.getenv("SENDER_PASSWORD")),
+        "sender_email": os.getenv("SMTP_FROM_EMAIL", "NOT_SET").replace("mailto:", ""),
+        "sender_password_set": bool(os.getenv("SMTP_PASSWORD")),
         "smtp_server": os.getenv("SMTP_SERVER", "NOT_SET"),
         "smtp_port": os.getenv("SMTP_PORT", "NOT_SET"),
-        "sender_name": os.getenv("SENDER_NAME", "NOT_SET")
+        "sender_name": os.getenv("SMTP_FROM_NAME", "NOT_SET")
     }
     
     # Test SMTP connection
@@ -493,7 +493,7 @@ def test_email_config():
             import smtplib
             server = smtplib.SMTP(config_status["smtp_server"], int(config_status["smtp_port"]))
             server.starttls()
-            server.login(config_status["sender_email"], os.getenv("SENDER_PASSWORD", ""))
+            server.login(config_status["sender_email"], os.getenv("SMTP_PASSWORD", ""))
             server.quit()
             config_status["smtp_connection"] = "SUCCESS"
         except Exception as e:
