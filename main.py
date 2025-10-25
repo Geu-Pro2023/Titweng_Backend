@@ -168,16 +168,18 @@ def detect_nose(image_bytes: bytes) -> Optional[bytes]:
 # ---------------------------
 # Email Configuration
 # ---------------------------
+# Use port 465 with SSL for better Gmail compatibility
 mail_config = ConnectionConfig(
-    MAIL_USERNAME=os.getenv("SMTP_USERNAME", "g.bior@alustudent.com").replace("mailto:", ""),
+    MAIL_USERNAME=os.getenv("SMTP_FROM_EMAIL", "g.bior@alustudent.com").replace("mailto:", ""),
     MAIL_PASSWORD=os.getenv("SMTP_PASSWORD", ""),
     MAIL_FROM=os.getenv("SMTP_FROM_EMAIL", "g.bior@alustudent.com").replace("mailto:", ""),
-    MAIL_PORT=int(os.getenv("SMTP_PORT", "587")),
-    MAIL_SERVER=os.getenv("SMTP_SERVER", "smtp.gmail.com"),
+    MAIL_PORT=465,  # Use SSL port instead of STARTTLS
+    MAIL_SERVER="smtp.gmail.com",
     MAIL_FROM_NAME=os.getenv("SMTP_FROM_NAME", "Titweng Cattle System"),
-    MAIL_STARTTLS=True,
-    MAIL_SSL_TLS=False,
-    USE_CREDENTIALS=True
+    MAIL_STARTTLS=False,
+    MAIL_SSL_TLS=True,  # Use SSL instead of STARTTLS
+    USE_CREDENTIALS=True,
+    VALIDATE_CERTS=True
 )
 
 fastmail = FastMail(mail_config) if FASTMAIL_AVAILABLE else None
@@ -358,19 +360,22 @@ async def send_registration_email(to_email: str, owner_name: str, cow, pdf_path:
         except Exception as e:
             logger.error(f"FastMail failed: {e}")
     
-    # Fallback to built-in SMTP
+    # Fallback to built-in SMTP with SSL
     try:
         import smtplib
         from email.mime.multipart import MIMEMultipart
         from email.mime.text import MIMEText
         from email.mime.base import MIMEBase
         from email import encoders
+        import socket
         
-        smtp_server = os.getenv("SMTP_SERVER", "smtp.gmail.com")
-        smtp_port = int(os.getenv("SMTP_PORT", "587"))
         sender_email = os.getenv("SMTP_FROM_EMAIL", "").replace("mailto:", "")
         sender_password = os.getenv("SMTP_PASSWORD", "")
         sender_name = os.getenv("SMTP_FROM_NAME", "Titweng Cattle System")
+        
+        if not sender_email or not sender_password:
+            logger.error("Email credentials not configured")
+            return False
         
         msg = MIMEMultipart()
         msg['From'] = f"{sender_name} <{sender_email}>"
@@ -409,17 +414,17 @@ async def send_registration_email(to_email: str, owner_name: str, cow, pdf_path:
                 )
                 msg.attach(part)
         
-        server = smtplib.SMTP(smtp_server, smtp_port)
-        server.starttls()
+        # Use SSL connection (port 465) with timeout
+        server = smtplib.SMTP_SSL("smtp.gmail.com", 465, timeout=30)
         server.login(sender_email, sender_password)
         server.send_message(msg)
         server.quit()
         
-        logger.info(f"Registration email sent via SMTP to {to_email} for cow {cow.cow_id}")
+        logger.info(f"Registration email sent via SSL SMTP to {to_email} for cow {cow.cow_id}")
         return True
         
     except Exception as e:
-        logger.error(f"Failed to send registration email via SMTP: {e}")
+        logger.error(f"Failed to send registration email via SSL SMTP: {e}")
         return False
 
 async def send_transfer_email(to_email: str, new_owner_name: str, old_owner_name: str, cow, pdf_path: str):
@@ -530,23 +535,25 @@ def test_email_config():
         "sender_email": os.getenv("SMTP_FROM_EMAIL", "NOT_SET").replace("mailto:", ""),
         "sender_password_set": bool(os.getenv("SMTP_PASSWORD")),
         "smtp_server": os.getenv("SMTP_SERVER", "NOT_SET"),
-        "smtp_port": os.getenv("SMTP_PORT", "NOT_SET"),
+        "smtp_port": "465 (SSL)",
         "sender_name": os.getenv("SMTP_FROM_NAME", "NOT_SET")
     }
     
-    # Test SMTP connection
-    if FASTMAIL_AVAILABLE:
-        try:
-            import smtplib
-            server = smtplib.SMTP(config_status["smtp_server"], int(config_status["smtp_port"]))
-            server.starttls()
-            server.login(config_status["sender_email"], os.getenv("SMTP_PASSWORD", ""))
+    # Test SMTP connection with SSL
+    try:
+        import smtplib
+        sender_email = config_status["sender_email"]
+        sender_password = os.getenv("SMTP_PASSWORD", "")
+        
+        if sender_email and sender_password:
+            server = smtplib.SMTP_SSL("smtp.gmail.com", 465, timeout=30)
+            server.login(sender_email, sender_password)
             server.quit()
             config_status["smtp_connection"] = "SUCCESS"
-        except Exception as e:
-            config_status["smtp_connection"] = f"FAILED: {str(e)}"
-    else:
-        config_status["smtp_connection"] = "FastMail not available"
+        else:
+            config_status["smtp_connection"] = "FAILED: Missing credentials"
+    except Exception as e:
+        config_status["smtp_connection"] = f"FAILED: {str(e)}"
     
     return config_status
 
