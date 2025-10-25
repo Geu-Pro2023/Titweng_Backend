@@ -70,6 +70,42 @@ async def lifespan(app: FastAPI):
     os.makedirs("static/qrcodes", exist_ok=True)
     os.makedirs("static/receipts", exist_ok=True)
     os.makedirs("logs", exist_ok=True)
+    
+    # Create tables and admin user on startup
+    try:
+        from database import engine, SessionLocal
+        from models import Base, User
+        import bcrypt
+        
+        # Create all tables
+        Base.metadata.create_all(bind=engine)
+        logger.info("✅ Database tables created")
+        
+        # Create admin user if not exists
+        db = SessionLocal()
+        admin_username = os.getenv("ADMIN_USERNAME", "titweng")
+        admin_password = os.getenv("ADMIN_PASSWORD", "titweng@2025")
+        admin_email = os.getenv("ADMIN_EMAIL", "admin@titweng.com")
+        
+        existing_admin = db.query(User).filter(User.username == admin_username).first()
+        if not existing_admin:
+            password_hash = bcrypt.hashpw(admin_password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+            admin = User(
+                username=admin_username,
+                email=admin_email,
+                password_hash=password_hash,
+                role="admin"
+            )
+            db.add(admin)
+            db.commit()
+            logger.info(f"✅ Admin user '{admin_username}' created")
+        else:
+            logger.info(f"✅ Admin user '{admin_username}' already exists")
+        db.close()
+        
+    except Exception as e:
+        logger.error(f"Database setup error: {e}")
+    
     logger.info("✅ Using Hugging Face models")
     yield
     logger.info("Shutting down...")
