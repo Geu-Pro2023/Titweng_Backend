@@ -474,6 +474,72 @@ def health_check():
     }
 
 # ---------------------------
+# Email Test Endpoint
+# ---------------------------
+@app.get("/test-email-config")
+def test_email_config():
+    """Test email configuration and credentials"""
+    config_status = {
+        "fastmail_available": FASTMAIL_AVAILABLE,
+        "sender_email": os.getenv("SENDER_EMAIL", "NOT_SET"),
+        "sender_password_set": bool(os.getenv("SENDER_PASSWORD")),
+        "smtp_server": os.getenv("SMTP_SERVER", "NOT_SET"),
+        "smtp_port": os.getenv("SMTP_PORT", "NOT_SET"),
+        "sender_name": os.getenv("SENDER_NAME", "NOT_SET")
+    }
+    
+    # Test SMTP connection
+    if FASTMAIL_AVAILABLE:
+        try:
+            import smtplib
+            server = smtplib.SMTP(config_status["smtp_server"], int(config_status["smtp_port"]))
+            server.starttls()
+            server.login(config_status["sender_email"], os.getenv("SENDER_PASSWORD", ""))
+            server.quit()
+            config_status["smtp_connection"] = "SUCCESS"
+        except Exception as e:
+            config_status["smtp_connection"] = f"FAILED: {str(e)}"
+    else:
+        config_status["smtp_connection"] = "FastMail not available"
+    
+    return config_status
+
+@app.post("/send-test-email")
+async def send_test_email(
+    test_email: str = Form(...),
+    current_admin=Depends(get_current_admin)
+):
+    """Send a test email to verify email functionality"""
+    if not FASTMAIL_AVAILABLE or not fastmail:
+        raise HTTPException(status_code=503, detail="Email service not available")
+    
+    try:
+        subject = "🧪 Titweng Email Test"
+        body = """
+        <html>
+        <body>
+        <h2>Email Test Successful! ✅</h2>
+        <p>This is a test email from the Titweng Cattle Recognition System.</p>
+        <p>If you received this email, your email configuration is working correctly.</p>
+        <p>Best regards,<br>Titweng Team</p>
+        </body>
+        </html>
+        """
+        
+        message = MessageSchema(
+            subject=subject,
+            recipients=[test_email],
+            body=body,
+            subtype="html"
+        )
+        
+        await fastmail.send_message(message)
+        return {"success": True, "message": f"Test email sent to {test_email}"}
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to send test email: {str(e)}")
+
+# ---------------------------
 # Manual Database Setup
 # ---------------------------
 @app.post("/setup-database")
