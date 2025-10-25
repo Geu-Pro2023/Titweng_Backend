@@ -1,5 +1,5 @@
-fastapi==0.68.0
-uvicorn[standard]==0.15.0
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
 sqlalchemy==1.4.23
 psycopg2-binary==2.9.1
 python-multipart==0.0.5
@@ -16,4 +16,5 @@ twilio==8.10.3
 pgvector==0.2.4
 gradio_client==0.7.3
 fastapi-mail==1.4.1
+pydantic==2.5.0
 # opencv-python-headless==4.8.1.78
