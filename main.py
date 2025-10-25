@@ -351,20 +351,22 @@ async def send_registration_email(to_email: str, owner_name: str, cow, pdf_path:
         </html>
         """
         
-        message = MessageSchema(
-            subject=subject,
-            recipients=[to_email],
-            body=body,
-            subtype="html"
-        )
-        
         if pdf_path and os.path.exists(pdf_path):
-            with open(pdf_path, "rb") as f:
-                message.attachments = [{
-                    "file": f.read(),
-                    "filename": f"Titweng_Registration_Certificate_{cow.cow_tag}.pdf",
-                    "content_type": "application/pdf"
-                }]
+            from fastapi_mail import MessageType
+            message = MessageSchema(
+                subject=subject,
+                recipients=[to_email],
+                body=body,
+                subtype=MessageType.html,
+                attachments=[pdf_path]
+            )
+        else:
+            message = MessageSchema(
+                subject=subject,
+                recipients=[to_email],
+                body=body,
+                subtype="html"
+            )
         
         await fastmail.send_message(message)
         logger.info(f"Registration email sent to {to_email} for cow {cow.cow_id}")
@@ -430,20 +432,22 @@ async def send_transfer_email(to_email: str, new_owner_name: str, old_owner_name
         </html>
         """
         
-        message = MessageSchema(
-            subject=subject,
-            recipients=[to_email],
-            body=body,
-            subtype="html"
-        )
-        
         if pdf_path and os.path.exists(pdf_path):
-            with open(pdf_path, "rb") as f:
-                message.attachments = [{
-                    "file": f.read(),
-                    "filename": f"Titweng_Transfer_Certificate_{cow.cow_tag}_from_{old_owner_name.replace(' ', '_')}_to_{new_owner_name.replace(' ', '_')}.pdf",
-                    "content_type": "application/pdf"
-                }]
+            from fastapi_mail import MessageType
+            message = MessageSchema(
+                subject=subject,
+                recipients=[to_email],
+                body=body,
+                subtype=MessageType.html,
+                attachments=[pdf_path]
+            )
+        else:
+            message = MessageSchema(
+                subject=subject,
+                recipients=[to_email],
+                body=body,
+                subtype="html"
+            )
         
         await fastmail.send_message(message)
         logger.info(f"Transfer email sent to {to_email} for cow {cow.cow_id}")
