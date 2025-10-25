@@ -69,6 +69,7 @@ class User(Base):
     phone = Column(String(20))
     password_hash = Column(Text, nullable=False)
     role = Column(String(20), default="admin")  # admin only
+    user_type = Column(String(20), default="admin")
     created_at = Column(TIMESTAMP, server_default=func.now())
 
 

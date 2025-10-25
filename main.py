@@ -79,10 +79,9 @@ async def lifespan(app: FastAPI):
         
         # Install pgvector extension and create tables
         logger.info("Installing pgvector extension...")
-        with engine.connect() as conn:
+        with engine.begin() as conn:
             from sqlalchemy import text
             conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector;"))
-            conn.commit()
         logger.info("✅ pgvector extension installed")
         
         logger.info("Creating database tables...")
@@ -277,10 +276,9 @@ def setup_database():
         import bcrypt
         
         # Install pgvector extension first
-        with engine.connect() as conn:
+        with engine.begin() as conn:
             from sqlalchemy import text
             conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector;"))
-            conn.commit()
         
         # Create all tables
         Base.metadata.drop_all(bind=engine)
