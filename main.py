@@ -85,8 +85,7 @@ async def lifespan(app: FastAPI):
         logger.info("✅ pgvector extension installed")
         
         logger.info("Creating database tables...")
-        Base.metadata.drop_all(bind=engine)  # Drop existing tables
-        Base.metadata.create_all(bind=engine)  # Create fresh tables
+        Base.metadata.create_all(bind=engine)  # Create tables if they don't exist
         logger.info("✅ Database tables created successfully")
         
         # Create admin user if not exists
