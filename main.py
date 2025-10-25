@@ -300,35 +300,136 @@ def admin_login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = 
 # Email Sending Functions
 # ---------------------------
 async def send_registration_email(to_email: str, owner_name: str, cow, pdf_path: str):
-    """Send registration confirmation email - simplified for cloud deployment"""
+    """Send registration confirmation email via Brevo API"""
     try:
-        # Log email details for debugging
-        logger.info(f"Email would be sent to: {to_email}")
-        logger.info(f"Owner: {owner_name}, Cow: {cow.cow_tag}")
-        logger.info(f"PDF path: {pdf_path}")
+        import requests
+        import base64
         
-        # For now, just log success since SMTP is blocked on Render
-        logger.info(f"✅ Registration email logged for {to_email} - cow {cow.cow_tag}")
-        return True
+        brevo_api_key = os.getenv("BREVO_API_KEY")
+        sender_email = os.getenv("SMTP_FROM_EMAIL", "g.bior@alustudent.com")
+        sender_name = os.getenv("SMTP_FROM_NAME", "Titweng Cattle System")
         
+        if not brevo_api_key:
+            logger.warning("Brevo API key not configured, logging email instead")
+            logger.info(f"📧 Registration email for {to_email} - cow {cow.cow_tag}")
+            return True
+        
+        # Prepare attachment
+        attachment = None
+        if pdf_path and os.path.exists(pdf_path):
+            with open(pdf_path, "rb") as f:
+                pdf_content = base64.b64encode(f.read()).decode()
+                attachment = {
+                    "content": pdf_content,
+                    "name": f"Titweng_Certificate_{cow.cow_tag}.pdf"
+                }
+        
+        # Send via Brevo API
+        url = "https://api.brevo.com/v3/smtp/email"
+        headers = {
+            "api-key": brevo_api_key,
+            "Content-Type": "application/json"
+        }
+        
+        data = {
+            "sender": {"name": sender_name, "email": sender_email},
+            "to": [{"email": to_email, "name": owner_name}],
+            "subject": f"🐄 Cow Registration Successful - {cow.cow_tag}",
+            "htmlContent": f"""
+            <h2>🎉 Cow Registration Successful!</h2>
+            <p>Dear <strong>{owner_name}</strong>,</p>
+            <p>Your cow has been successfully registered!</p>
+            <ul>
+            <li><strong>Cow Tag:</strong> {cow.cow_tag}</li>
+            <li><strong>Breed:</strong> {cow.breed or 'N/A'}</li>
+            <li><strong>Color:</strong> {cow.color or 'N/A'}</li>
+            <li><strong>Age:</strong> {cow.age or 'N/A'} years</li>
+            <li><strong>Registration Date:</strong> {cow.registration_date.strftime('%Y-%m-%d')}</li>
+            </ul>
+            <p>Best regards,<br>Titweng Team</p>
+            """
+        }
+        
+        if attachment:
+            data["attachment"] = [attachment]
+        
+        response = requests.post(url, json=data, headers=headers, timeout=30)
+        
+        if response.status_code == 201:
+            logger.info(f"✅ Registration email sent via Brevo to {to_email}")
+            return True
+        else:
+            logger.error(f"Brevo API error: {response.status_code} - {response.text}")
+            return False
+            
     except Exception as e:
-        logger.error(f"Email logging failed: {e}")
+        logger.error(f"Failed to send email via Brevo: {e}")
         return False
 
 async def send_transfer_email(to_email: str, new_owner_name: str, old_owner_name: str, cow, pdf_path: str):
-    """Send ownership transfer confirmation email - simplified for cloud deployment"""
+    """Send ownership transfer confirmation email via Brevo API"""
     try:
-        # Log transfer email details
-        logger.info(f"Transfer email would be sent to: {to_email}")
-        logger.info(f"Transfer: {old_owner_name} -> {new_owner_name}, Cow: {cow.cow_tag}")
-        logger.info(f"PDF path: {pdf_path}")
+        import requests
+        import base64
         
-        # Log success since SMTP is blocked
-        logger.info(f"✅ Transfer email logged for {to_email} - cow {cow.cow_tag}")
-        return True
+        brevo_api_key = os.getenv("BREVO_API_KEY")
+        sender_email = os.getenv("SMTP_FROM_EMAIL", "g.bior@alustudent.com")
+        sender_name = os.getenv("SMTP_FROM_NAME", "Titweng Cattle System")
         
+        if not brevo_api_key:
+            logger.warning("Brevo API key not configured, logging email instead")
+            logger.info(f"📧 Transfer email for {to_email} - cow {cow.cow_tag}")
+            return True
+        
+        # Prepare attachment
+        attachment = None
+        if pdf_path and os.path.exists(pdf_path):
+            with open(pdf_path, "rb") as f:
+                pdf_content = base64.b64encode(f.read()).decode()
+                attachment = {
+                    "content": pdf_content,
+                    "name": f"Titweng_Transfer_{cow.cow_tag}.pdf"
+                }
+        
+        # Send via Brevo API
+        url = "https://api.brevo.com/v3/smtp/email"
+        headers = {
+            "api-key": brevo_api_key,
+            "Content-Type": "application/json"
+        }
+        
+        data = {
+            "sender": {"name": sender_name, "email": sender_email},
+            "to": [{"email": to_email, "name": new_owner_name}],
+            "subject": f"🔄 Cow Ownership Transfer - {cow.cow_tag}",
+            "htmlContent": f"""
+            <h2>🔄 Ownership Transfer Completed!</h2>
+            <p>Dear <strong>{new_owner_name}</strong>,</p>
+            <p>Cow <strong>{cow.cow_tag}</strong> has been transferred to you!</p>
+            <ul>
+            <li><strong>Cow Tag:</strong> {cow.cow_tag}</li>
+            <li><strong>Previous Owner:</strong> {old_owner_name}</li>
+            <li><strong>New Owner:</strong> {new_owner_name}</li>
+            <li><strong>Transfer Date:</strong> {cow.transfer_date.strftime('%Y-%m-%d')}</li>
+            </ul>
+            <p>Best regards,<br>Titweng Team</p>
+            """
+        }
+        
+        if attachment:
+            data["attachment"] = [attachment]
+        
+        response = requests.post(url, json=data, headers=headers, timeout=30)
+        
+        if response.status_code == 201:
+            logger.info(f"✅ Transfer email sent via Brevo to {to_email}")
+            return True
+        else:
+            logger.error(f"Brevo API error: {response.status_code} - {response.text}")
+            return False
+            
     except Exception as e:
-        logger.error(f"Transfer email logging failed: {e}")
+        logger.error(f"Failed to send transfer email via Brevo: {e}")
         return False
 
 # ---------------------------
