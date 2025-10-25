@@ -258,3 +258,39 @@ def health_check():
             "mobile": "/mobile/*"
         }
     }
+
+# ---------------------------
+# Manual Database Setup
+# ---------------------------
+@app.post("/setup-database")
+def setup_database():
+    try:
+        from database import engine, SessionLocal
+        from models import Base, User
+        import bcrypt
+        
+        # Create all tables
+        Base.metadata.drop_all(bind=engine)
+        Base.metadata.create_all(bind=engine)
+        
+        # Create admin user
+        db = SessionLocal()
+        admin_username = os.getenv("ADMIN_USERNAME", "titweng")
+        admin_password = os.getenv("ADMIN_PASSWORD", "titweng@2025")
+        admin_email = os.getenv("ADMIN_EMAIL", "admin@titweng.com")
+        
+        password_hash = bcrypt.hashpw(admin_password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+        admin = User(
+            username=admin_username,
+            email=admin_email,
+            password_hash=password_hash,
+            role="admin",
+            user_type="admin"
+        )
+        db.add(admin)
+        db.commit()
+        db.close()
+        
+        return {"success": True, "message": "Database setup completed"}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
