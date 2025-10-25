@@ -62,8 +62,8 @@ async def admin_register_new_cow(
     if len(files) != REGISTRATION_CONFIG["min_images"]:
         raise HTTPException(status_code=400, detail=f"Exactly {REGISTRATION_CONFIG['min_images']} nose print images required")
 
-    # Process nose print images
-    embeddings_data = []
+    # Check for duplicate registration first
+    all_embeddings = db.query(Embedding).all()
     for idx, f in enumerate(files):
         contents = await f.read()
             
@@ -72,15 +72,32 @@ async def admin_register_new_cow(
         if nose is None:
             raise HTTPException(status_code=400, detail=f"No cow nose detected in {f.filename}")
         
-        quality_score = 0.8
+        # Extract embedding for duplicate check
+        emb = main.extract_embedding(nose)
         
-        # Extract nose print embedding using HF API
+        # Check if this cow is already registered (strict threshold)
+        for existing_emb in all_embeddings:
+            stored_emb = np.array(existing_emb.embedding)
+            similarity = np.dot(emb, stored_emb) / (np.linalg.norm(emb) * np.linalg.norm(stored_emb))
+            
+            if similarity > 0.90:  # Very strict threshold for duplicate detection
+                existing_cow = db.query(Cow).filter(Cow.cow_id == existing_emb.cow_id).first()
+                raise HTTPException(
+                    status_code=409, 
+                    detail=f"🚫 COW ALREADY REGISTERED! This cow is already in the system as {existing_cow.cow_tag} owned by {existing_cow.owner.full_name}. Registration similarity: {similarity:.3f}"
+                )
+    
+    # Process nose print images if no duplicates found
+    embeddings_data = []
+    for idx, f in enumerate(files):
+        contents = await f.read()
+        nose = main.detect_nose(contents)
         emb = main.extract_embedding(nose)
         
         embeddings_data.append({
             "embedding": emb.tolist(),
             "angle": REQUIRED_ANGLES[idx],
-            "quality_score": quality_score,
+            "quality_score": 0.8,
             "is_primary": "yes" if idx == 0 else "no",
             "image_path": f.filename
         })
@@ -460,10 +477,10 @@ async def admin_verify_cow_by_nose(
                 best_similarity = cos_sim
                 best_cow_id = emb_record.cow_id
         
-        # Get cow details if match found
-        if best_similarity > 0.75:
+        # Get cow details if match found (stricter threshold)
+        if best_similarity > 0.88:  # Much stricter threshold
             cow = db.query(Cow).filter(Cow.cow_id == best_cow_id).first()
-            verified_status = "yes" if best_similarity > 0.85 else "partial"
+            verified_status = "yes" if best_similarity > 0.92 else "partial"
             
             # Log verification
             log = VerificationLog(

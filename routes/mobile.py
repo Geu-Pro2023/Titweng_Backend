@@ -55,8 +55,8 @@ async def verify_cow_by_nose(
                 best_similarity = cos_sim
                 best_match = emb_record.cow_id
         
-        # Get cow details if match found
-        if best_similarity > 0.75:
+        # Get cow details if match found (stricter threshold)
+        if best_similarity > 0.88:  # Much stricter threshold to prevent false positives
             cow = db.query(Cow).filter(Cow.cow_id == best_match).first()
             
             # Send SMS alert to owner (disabled until Twilio configured)
@@ -231,8 +231,8 @@ async def verify_cow_live_camera(
             best_similarity = cos_sim
             best_cow_id = emb_record.cow_id
     
-    # Get cow details if match found
-    if best_similarity > 0.75:
+    # Get cow details if match found (stricter threshold)
+    if best_similarity > 0.88:  # Much stricter threshold to prevent false positives
         cow = db.query(Cow).filter(Cow.cow_id == best_cow_id).first()
         
         # Send SMS alert to owner (disabled until Twilio configured)
