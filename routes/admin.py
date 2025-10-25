@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 from typing import List, Optional
 from datetime import datetime
 import numpy as np
+import os
 # Removed torch dependency
 
 import main
@@ -603,4 +604,57 @@ def admin_dashboard_stats(
         "total_verifications": total_verifications,
         "successful_verifications": successful_verifications,
         "pending_reports": pending_reports
+    }
+
+# ---------------------------
+# 9. Download Cow Receipt (Admin)
+# ---------------------------
+@router.get("/receipt/{cow_tag}", summary="Download cow receipt by tag")
+def admin_download_receipt(
+    cow_tag: str,
+    db: Session = Depends(get_db),
+    current_admin=Depends(get_current_admin)
+):
+    from fastapi.responses import FileResponse
+    
+    # Find cow by tag
+    cow = db.query(Cow).filter(Cow.cow_tag == cow_tag).first()
+    if not cow:
+        raise HTTPException(status_code=404, detail="Cow not found")
+    
+    # Check if receipt exists
+    if not cow.receipt_pdf_path or not os.path.exists(cow.receipt_pdf_path):
+        raise HTTPException(status_code=404, detail="Receipt not found")
+    
+    # Return file for download
+    return FileResponse(
+        path=cow.receipt_pdf_path,
+        filename=f"Titweng_Receipt_{cow_tag}.pdf",
+        media_type="application/pdf"
+    )
+
+@router.post("/receipt/info", summary="Get cow receipt info by tag")
+def admin_get_receipt_info(
+    cow_tag: str = Form(...),
+    db: Session = Depends(get_db),
+    current_admin=Depends(get_current_admin)
+):
+    # Find cow by tag
+    cow = db.query(Cow).filter(Cow.cow_tag == cow_tag).first()
+    if not cow:
+        raise HTTPException(status_code=404, detail="Cow not found")
+    
+    return {
+        "cow_tag": cow.cow_tag,
+        "cow_id": cow.cow_id,
+        "breed": cow.breed,
+        "color": cow.color,
+        "age": cow.age,
+        "owner_name": cow.owner.full_name if cow.owner else None,
+        "owner_email": cow.owner.email if cow.owner else None,
+        "registration_date": cow.registration_date.strftime('%Y-%m-%d'),
+        "receipt_available": bool(cow.receipt_pdf_path and os.path.exists(cow.receipt_pdf_path)),
+        "receipt_path": cow.receipt_pdf_path,
+        "qr_code_available": bool(cow.qr_code_path and os.path.exists(cow.qr_code_path)),
+        "download_url": f"/admin/receipt/{cow_tag}" if cow.receipt_pdf_path else None
     }
