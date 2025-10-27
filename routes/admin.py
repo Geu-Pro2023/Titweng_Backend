@@ -479,25 +479,18 @@ async def admin_verify_cow_by_nose(
         # Convert embedding to string format for pgvector
         emb_str = '[' + ','.join(map(str, query_emb.tolist())) + ']'
         
-        # Find top 3 most similar embeddings using pgvector
+        # Find most similar embedding using pgvector cosine similarity
         query = text("""
-            SELECT cow_id, embedding <=> :query_emb as distance
+            SELECT cow_id, (1 - (embedding <=> :query_emb)) as similarity
             FROM embeddings 
             ORDER BY embedding <=> :query_emb 
-            LIMIT 3
+            LIMIT 1
         """)
         
-        results = db.execute(query, {"query_emb": emb_str}).fetchall()
+        result = db.execute(query, {"query_emb": emb_str}).fetchone()
         
-        best_similarity = 0
-        best_cow_id = None
-        
-        # Convert distance to similarity and find best match
-        for row in results:
-            similarity = 1 - row.distance  # Convert distance to similarity
-            if similarity > best_similarity:
-                best_similarity = similarity
-                best_cow_id = row.cow_id
+        best_similarity = result.similarity if result else 0
+        best_cow_id = result.cow_id if result else None
         
         # Require VERY high similarity for 100k+ scale (95%+)
         if best_similarity > 0.95:  # Ultra-strict threshold for large scale
