@@ -433,6 +433,66 @@ async def send_transfer_email(to_email: str, new_owner_name: str, old_owner_name
         return False
 
 # ---------------------------
+# ML Model Diagnostics
+# ---------------------------
+@app.post("/test-ml-models", summary="Test ML model outputs and dimensions")
+async def test_ml_models(
+    file: UploadFile = File(...)
+):
+    """Diagnostic endpoint to test ML model outputs"""
+    try:
+        contents = await file.read()
+        
+        # Test YOLO detector
+        yolo_result = main.detect_nose(contents)
+        
+        # Test Siamese embedder
+        if yolo_result:
+            embedding = main.extract_embedding(contents)
+            
+            return {
+                "success": True,
+                "yolo_detector": {
+                    "nose_detected": yolo_result is not None,
+                    "bbox": yolo_result.get('bbox') if yolo_result else None,
+                    "confidence": yolo_result.get('confidence') if yolo_result else None
+                },
+                "siamese_embedder": {
+                    "embedding_generated": embedding is not None,
+                    "embedding_dimension": len(embedding) if embedding is not None else 0,
+                    "embedding_type": str(type(embedding)),
+                    "embedding_sample": embedding[:5].tolist() if embedding is not None else None,
+                    "embedding_norm": float(np.linalg.norm(embedding)) if embedding is not None else 0,
+                    "embedding_normalized": bool(abs(np.linalg.norm(embedding) - 1.0) < 0.1) if embedding is not None else False
+                },
+                "database_compatibility": {
+                    "expected_dimension": 256,
+                    "dimension_match": len(embedding) == 256 if embedding is not None else False,
+                    "pgvector_format": '[' + ','.join(map(str, embedding[:3].tolist())) + '...]' if embedding is not None else None
+                }
+            }
+        else:
+            return {
+                "success": False,
+                "error": "YOLO detector failed to detect nose",
+                "yolo_detector": {
+                    "nose_detected": False,
+                    "bbox": None,
+                    "confidence": None
+                }
+            }
+            
+    except Exception as e:
+        return {
+            "success": False,
+            "error": str(e),
+            "debug_info": {
+                "file_size": len(contents) if 'contents' in locals() else 0,
+                "file_type": file.content_type
+            }
+        }
+
+# ---------------------------
 # Health Check
 # ---------------------------
 @app.get("/health")
@@ -473,6 +533,14 @@ def test_email_config():
             server = smtplib.SMTP_SSL("smtp.gmail.com", 465, timeout=30)
             server.login(sender_email, sender_password)
             server.quit()
+            config_status["smtp_connection"] = "success"
+        else:
+            config_status["smtp_connection"] = "credentials_missing"
+            
+    except Exception as e:
+        config_status["smtp_connection"] = f"failed: {str(e)}"
+    
+    return config_status()
             config_status["smtp_connection"] = "SUCCESS"
         else:
             config_status["smtp_connection"] = "FAILED: Missing credentials"
