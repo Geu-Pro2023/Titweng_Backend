@@ -16,10 +16,23 @@ class MLModelClient:
             try:
                 print(f"Loaded Siamese API: {self.siamese_api} ✔")
                 self.siamese_client = Client(self.siamese_api)
+                # Test the client immediately
+                print("📊 Testing Siamese client connection...")
+                return self.siamese_client
             except Exception as e:
                 print(f"⚠️ Siamese client failed: {e}")
                 self.siamese_client = False
-        return self.siamese_client if self.siamese_client is not False else None
+                return None
+        elif self.siamese_client is False:
+            # Try to reconnect
+            try:
+                print("🔄 Retrying Siamese client connection...")
+                self.siamese_client = Client(self.siamese_api)
+                return self.siamese_client
+            except Exception as e:
+                print(f"⚠️ Siamese reconnect failed: {e}")
+                return None
+        return self.siamese_client
     
     def detect_nose(self, image_bytes: bytes) -> Optional[dict]:
         """Skip YOLO - images are already cropped noses"""
@@ -43,13 +56,27 @@ class MLModelClient:
                 tmp_path = tmp_file.name
             
             print(f"🧠 Running Siamese Embedding Extractor... (file: {len(image_bytes)} bytes)")
-            siamese_result = client.predict(
-                image=handle_file(tmp_path),
-                api_name="/predict"
-            )
+            
+            # Add timeout and retry for API call
+            import time
+            for attempt in range(2):
+                try:
+                    siamese_result = client.predict(
+                        image=handle_file(tmp_path),
+                        api_name="/predict"
+                    )
+                    break
+                except Exception as api_error:
+                    print(f"⚠️ API attempt {attempt + 1} failed: {api_error}")
+                    if attempt == 0:
+                        time.sleep(2)  # Wait before retry
+                        continue
+                    else:
+                        raise api_error
             
             # Clean up temp file
-            os.unlink(tmp_path)
+            if os.path.exists(tmp_path):
+                os.unlink(tmp_path)
             
             print(f"📊 Siamese result type: {type(siamese_result)}")
             print(f"📊 Siamese result: {siamese_result}")
