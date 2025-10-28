@@ -45,11 +45,23 @@ class MLModelClient:
                 # Clean up temp file
                 os.unlink(tmp_path)
                 
-                # EXACT same parsing as test_model_outputs.py
-                embedding_list = siamese_result.get("embedding", [])
+                # Handle your actual HF Space format
+                print(f"Raw result: {siamese_result}")
+                
+                # Your Space returns the embedding directly, not in a dict
+                if isinstance(siamese_result, dict) and "embedding" in siamese_result:
+                    embedding_list = siamese_result["embedding"]
+                elif isinstance(siamese_result, list) and len(siamese_result) > 0:
+                    embedding_list = siamese_result
+                else:
+                    print(f"Unexpected result format: {type(siamese_result)}")
+                    return None
+                
                 embedding = np.array(embedding_list, dtype=np.float32)
+                print(f"Embedding shape: {embedding.shape}")
                 
                 if embedding.size > 0 and embedding.shape[0] == 256:
+                    print("✅ Valid embedding extracted")
                     return embedding
                     
             except Exception as gradio_error:
