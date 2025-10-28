@@ -9,7 +9,6 @@ class MLModelClient:
         self.siamese_api = "Geuaguto/titweng-siamese-embedder"
         self.siamese_client = None
         print("✅ ML client initialized (lazy loading)")
-    
 
     def _get_siamese_client(self):
         if self.siamese_client is None:
@@ -35,51 +34,29 @@ class MLModelClient:
                 tmp_file.write(image_bytes)
                 tmp_path = tmp_file.name
             
-            print(f"🧠 Running Siamese Embedding Extractor... (image: {len(image_bytes)} bytes)")
-            print(f"📝 Temp file: {tmp_path}")
-            
+            print("🧠 Running Siamese Embedding Extractor...")
             siamese_result = client.predict(
                 image=handle_file(tmp_path),
                 api_name="/predict"
             )
             
-            print(f"📊 Raw API result: {siamese_result}")
-            print(f"📊 Result type: {type(siamese_result)}")
-            
             # Clean up temp file
             os.unlink(tmp_path)
             
-            # Check if result is None or empty
-            if siamese_result is None:
-                print("❌ API returned None")
-                return None
-            
-            if not isinstance(siamese_result, dict):
-                print(f"❌ API returned non-dict: {type(siamese_result)}")
-                return None
-            
             # EXACT same parsing as test_model_outputs.py
             embedding_list = siamese_result.get("embedding", [])
-            print(f"📊 Embedding list: {len(embedding_list) if embedding_list else 0} items")
-            
-            if not embedding_list:
-                print("❌ No embedding in result")
-                return None
-            
             embedding = np.array(embedding_list, dtype=np.float32)
-            print(f"📊 Embedding shape: {embedding.shape}")
+            embedding_dim = int(embedding.shape[0]) if embedding.size > 0 else 0
+            embedding_norm = float(np.linalg.norm(embedding)) if embedding.size > 0 else 0.0
+            embedding_generated = bool(embedding.size > 0)
+            embedding_normalized = bool(np.isclose(embedding_norm, 1.0)) if embedding.size > 0 else False
             
             if embedding.size > 0 and embedding.shape[0] == 256:
-                print(f"✅ Valid embedding extracted: {embedding.shape}")
                 return embedding
-            else:
-                print(f"❌ Invalid embedding dimensions: {embedding.shape}")
-                return None
+            return None
                 
         except Exception as e:
-            print(f"❌ Siamese API error: {e}")
-            import traceback
-            print(f"🔍 Full traceback: {traceback.format_exc()}")
+            print(f"Siamese API error: {e}")
             return None
 
 # Global client
