@@ -35,25 +35,51 @@ class MLModelClient:
                 tmp_file.write(image_bytes)
                 tmp_path = tmp_file.name
             
-            print("🧠 Running Siamese Embedding Extractor...")
+            print(f"🧠 Running Siamese Embedding Extractor... (image: {len(image_bytes)} bytes)")
+            print(f"📝 Temp file: {tmp_path}")
+            
             siamese_result = client.predict(
                 image=handle_file(tmp_path),
                 api_name="/predict"
             )
             
+            print(f"📊 Raw API result: {siamese_result}")
+            print(f"📊 Result type: {type(siamese_result)}")
+            
             # Clean up temp file
             os.unlink(tmp_path)
             
+            # Check if result is None or empty
+            if siamese_result is None:
+                print("❌ API returned None")
+                return None
+            
+            if not isinstance(siamese_result, dict):
+                print(f"❌ API returned non-dict: {type(siamese_result)}")
+                return None
+            
             # EXACT same parsing as test_model_outputs.py
             embedding_list = siamese_result.get("embedding", [])
+            print(f"📊 Embedding list: {len(embedding_list) if embedding_list else 0} items")
+            
+            if not embedding_list:
+                print("❌ No embedding in result")
+                return None
+            
             embedding = np.array(embedding_list, dtype=np.float32)
+            print(f"📊 Embedding shape: {embedding.shape}")
             
             if embedding.size > 0 and embedding.shape[0] == 256:
+                print(f"✅ Valid embedding extracted: {embedding.shape}")
                 return embedding
-            return None
+            else:
+                print(f"❌ Invalid embedding dimensions: {embedding.shape}")
+                return None
                 
         except Exception as e:
-            print(f"Siamese API error: {e}")
+            print(f"❌ Siamese API error: {e}")
+            import traceback
+            print(f"🔍 Full traceback: {traceback.format_exc()}")
             return None
 
 # Global client
