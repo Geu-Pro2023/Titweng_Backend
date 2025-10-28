@@ -6,22 +6,11 @@ from gradio_client import Client, handle_file
 
 class MLModelClient:
     def __init__(self):
-        self.yolo_api = "Geuaguto/titweng-yolo-detector"
         self.siamese_api = "Geuaguto/titweng-siamese-embedder"
-        self.yolo_client = None
         self.siamese_client = None
         print("✅ ML client initialized (lazy loading)")
     
-    def _get_yolo_client(self):
-        if self.yolo_client is None:
-            try:
-                self.yolo_client = Client(self.yolo_api)
-                print(f"✅ YOLO client connected: {self.yolo_api}")
-            except Exception as e:
-                print(f"⚠️ YOLO client failed: {e}")
-                self.yolo_client = False
-        return self.yolo_client if self.yolo_client is not False else None
-    
+
     def _get_siamese_client(self):
         if self.siamese_client is None:
             try:
@@ -33,42 +22,12 @@ class MLModelClient:
         return self.siamese_client if self.siamese_client is not False else None
     
     def detect_nose(self, image_bytes: bytes) -> Optional[dict]:
-        """YOLO nose detection - EXACT copy of test_model_outputs.py"""
-        try:
-            client = self._get_yolo_client()
-            if not client:
-                return None
-            
-            # Save bytes to temp file for handle_file()
-            with tempfile.NamedTemporaryFile(delete=False, suffix=".jpg") as tmp_file:
-                tmp_file.write(image_bytes)
-                tmp_path = tmp_file.name
-            
-            # EXACT same as test: use handle_file() and /predict
-            yolo_result = client.predict(
-                image=handle_file(tmp_path),
-                api_name="/predict"
-            )
-            
-            # Clean up temp file
-            os.unlink(tmp_path)
-            
-            # EXACT same parsing as test
-            nose_detected = bool(yolo_result.get("detected", False))
-            bbox = yolo_result.get("bbox", [])
-            confidence = float(yolo_result.get("confidence", 0.0))
-            
-            if nose_detected:
-                return {
-                    'detected': True,
-                    'bbox': bbox,
-                    'confidence': confidence
-                }
-            return None
-                
-        except Exception as e:
-            print(f"YOLO API error: {e}")
-            return None
+        """Skip YOLO - images are already cropped noses"""
+        return {
+            'detected': True,
+            'bbox': [0, 0, 100, 100],  # Dummy bbox since image is already cropped
+            'confidence': 1.0
+        }
     
     def extract_embedding(self, image_bytes: bytes) -> Optional[np.ndarray]:
         """Siamese embedding - EXACT copy of test_model_outputs.py"""
