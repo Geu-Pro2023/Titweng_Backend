@@ -30,38 +30,57 @@ class MLModelClient:
         }
     
     def extract_embedding(self, image_bytes: bytes) -> Optional[np.ndarray]:
-        """Siamese embedding - EXACT copy of test_model_outputs.py"""
-        try:
-            client = self._get_siamese_client()
-            if not client:
-                return None
-            
-            # Save bytes to temp file for handle_file()
-            with tempfile.NamedTemporaryFile(delete=False, suffix=".jpg") as tmp_file:
-                tmp_file.write(image_bytes)
-                tmp_path = tmp_file.name
-            
-            # EXACT same as test: use handle_file() and /predict
-            siamese_result = client.predict(
-                image=handle_file(tmp_path),
-                api_name="/predict"
-            )
-            
-            # Clean up temp file
-            os.unlink(tmp_path)
-            
-            # EXACT same parsing as test
-            embedding_list = siamese_result.get("embedding", [])
-            if embedding_list:
-                embedding = np.array(embedding_list, dtype=np.float32)
-                # Verify it's 256 dimensions and normalized like test
-                if embedding.shape[0] == 256:
-                    return embedding
-            return None
+        """Siamese embedding with retry logic"""
+        for attempt in range(3):  # 3 retry attempts
+            try:
+                client = self._get_siamese_client()
+                if not client:
+                    print(f"Attempt {attempt + 1}: Client not available")
+                    continue
                 
-        except Exception as e:
-            print(f"Siamese API error: {e}")
-            return None
+                # Save bytes to temp file for handle_file()
+                with tempfile.NamedTemporaryFile(delete=False, suffix=".jpg") as tmp_file:
+                    tmp_file.write(image_bytes)
+                    tmp_path = tmp_file.name
+                
+                try:
+                    # EXACT same as test: use handle_file() and /predict
+                    siamese_result = client.predict(
+                        image=handle_file(tmp_path),
+                        api_name="/predict"
+                    )
+                    
+                    # Clean up temp file
+                    os.unlink(tmp_path)
+                    
+                    # Check if result is valid
+                    if not siamese_result or not isinstance(siamese_result, dict):
+                        print(f"Attempt {attempt + 1}: Invalid result format")
+                        continue
+                    
+                    # EXACT same parsing as test
+                    embedding_list = siamese_result.get("embedding", [])
+                    if embedding_list and len(embedding_list) == 256:
+                        embedding = np.array(embedding_list, dtype=np.float32)
+                        print(f"✅ Embedding extracted successfully on attempt {attempt + 1}")
+                        return embedding
+                    else:
+                        print(f"Attempt {attempt + 1}: Invalid embedding dimensions: {len(embedding_list) if embedding_list else 0}")
+                        
+                except Exception as api_error:
+                    print(f"Attempt {attempt + 1}: API call failed: {api_error}")
+                    # Clean up temp file on error
+                    if os.path.exists(tmp_path):
+                        os.unlink(tmp_path)
+                    
+                    # Reset client for next attempt
+                    self.siamese_client = None
+                    
+            except Exception as e:
+                print(f"Attempt {attempt + 1}: General error: {e}")
+        
+        print("❌ All embedding extraction attempts failed")
+        return None
 
 # Global client
 ml_client = MLModelClient()
