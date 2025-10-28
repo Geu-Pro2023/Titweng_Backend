@@ -483,24 +483,6 @@ async def test_ml_models(
                 "pgvector_format": pgvector_format
             }
         }
-        else:
-            return {
-                "success": False,
-                "error": "YOLO detector failed to detect nose",
-                "yolo_detector": {
-                    "nose_detected": False,
-                    "bbox": [],
-                    "confidence": 0.0
-                },
-                "siamese_embedder": {
-                    "embedding_generated": False,
-                    "embedding_dimension": 0,
-                    "embedding_type": "None",
-                    "embedding_sample": [],
-                    "embedding_norm": 0.0,
-                    "embedding_normalized": False
-                }
-            }
             
     except Exception as e:
         return {
