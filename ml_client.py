@@ -106,21 +106,40 @@ class MLModelClient:
                 print(f"Cleaned up temp file: {tmp_path}")
     
     def _generate_fallback_embedding(self, image_bytes: bytes) -> np.ndarray:
-        """Generate deterministic embedding when HF Space is blocked"""
+        """Generate consistent embedding when HF Space is blocked"""
         import hashlib
+        from PIL import Image
+        import io
         
-        # Create deterministic hash from image
-        image_hash = hashlib.sha256(image_bytes).hexdigest()
+        try:
+            # Try to extract basic image features for consistency
+            img = Image.open(io.BytesIO(image_bytes))
+            
+            # Resize to standard size and get basic stats
+            img_resized = img.resize((64, 64))
+            img_array = np.array(img_resized.convert('L'))  # Convert to grayscale
+            
+            # Use image statistics as seed (more consistent for similar images)
+            mean_val = int(np.mean(img_array))
+            std_val = int(np.std(img_array))
+            
+            # Create seed from image characteristics (not exact hash)
+            seed = (mean_val * 1000 + std_val) % 999999
+            
+        except Exception:
+            # Fallback to hash if image processing fails
+            image_hash = hashlib.sha256(image_bytes).hexdigest()
+            seed = int(image_hash[:6], 16) % 999999
         
-        # Convert hash to 256-dim normalized vector
-        np.random.seed(int(image_hash[:8], 16))  # Use first 8 chars as seed
+        # Generate embedding with seed
+        np.random.seed(seed)
         embedding = np.random.normal(0, 1, 256).astype(np.float32)
         
-        # Normalize to unit vector (like real embeddings)
+        # Normalize to unit vector
         embedding = embedding / np.linalg.norm(embedding)
         
         print(f"✅ Fallback embedding generated: shape={embedding.shape}, norm={np.linalg.norm(embedding):.3f}")
-        print(f"📝 Note: Using deterministic fallback due to server restrictions")
+        print(f"📝 Note: Using image-based fallback (seed: {seed}) due to server restrictions")
         
         return embedding
 
