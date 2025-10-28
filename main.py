@@ -155,15 +155,15 @@ def extract_embedding(image_bytes: bytes) -> np.ndarray:
         logger.error(f"Embedding extraction failed: {e}")
         raise HTTPException(status_code=503, detail="Embedding service unavailable")
 
-def detect_nose(image_bytes: bytes) -> Optional[bytes]:
+def detect_nose(image_bytes: bytes) -> Optional[dict]:
     try:
         result = ml_client.detect_nose(image_bytes)
-        if result and 'cropped_image' in result:
-            return result['cropped_image']
-        return image_bytes  # Return original if no nose detected
+        if result:
+            return result  # Return detection result with bbox and confidence
+        return None
     except Exception as e:
         logger.warning(f"Nose detection failed: {e}")
-        return image_bytes
+        return None
 
 # ---------------------------
 # Email Configuration
@@ -444,11 +444,11 @@ async def test_ml_models(
         contents = await file.read()
         
         # Test YOLO detector
-        yolo_result = main.detect_nose(contents)
+        yolo_result = detect_nose(contents)
         
         # Test Siamese embedder
         if yolo_result:
-            embedding = main.extract_embedding(contents)
+            embedding = extract_embedding(contents)
             
             return {
                 "success": True,

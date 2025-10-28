@@ -35,12 +35,12 @@ async def verify_cow_by_nose(
         contents = await f.read()
         
         # Detect nose using HF API
-        nose = main.detect_nose(contents)
-        if nose is None:
+        nose_result = main.detect_nose(contents)
+        if nose_result is None:
             continue
         
         # Extract embedding using HF API
-        query_emb = main.extract_embedding(nose)
+        query_emb = main.extract_embedding(contents)
         
         # Use pgvector for efficient similarity search
         from sqlalchemy import text
@@ -210,18 +210,18 @@ async def verify_cow_live_camera(
     contents = await file.read()
         
     # Detect nose using HF API
-    nose = main.detect_nose(contents)
-    if nose is None:
+    nose_result = main.detect_nose(contents)
+    if nose_result is None:
         return {
             "nose_detected": False,
             "message": "No nose detected in frame",
             "suggestion": "Position cow's nose in camera view"
         }
     
-    detection_confidence = 0.8
+    detection_confidence = nose_result.get('confidence', 0.8)
     
     # Extract embedding using HF API
-    query_emb = main.extract_embedding(nose)
+    query_emb = main.extract_embedding(contents)
     
     # Use pgvector for efficient similarity search
     from sqlalchemy import text
