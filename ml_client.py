@@ -14,11 +14,19 @@ class MLModelClient:
         if self.siamese_client is None:
             print(f"Loading Siamese API: {self.siamese_api}...")
             
+            # Get HF token from environment
+            hf_token = os.getenv("HUGGINGFACE_API_TOKEN")
+            if hf_token:
+                print("🔑 Using HF API token for authentication")
+            
             # Try multiple times - HF Spaces can be slow to wake up
             for attempt in range(3):
                 try:
                     print(f"Attempt {attempt + 1}/3 to connect to HF Space...")
-                    self.siamese_client = Client(self.siamese_api)
+                    self.siamese_client = Client(
+                        self.siamese_api,
+                        hf_token=hf_token if hf_token else None
+                    )
                     print(f"✅ Siamese API loaded successfully!")
                     break
                 except Exception as e:
