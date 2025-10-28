@@ -11,10 +11,9 @@ class MLModelClient:
         print("✅ ML client initialized (lazy loading)")
 
     def _get_siamese_client(self):
-        if self.siamese_client is None:
-            print(f"Loaded Siamese API: {self.siamese_api} ✔")
-            self.siamese_client = Client(self.siamese_api)
-        return self.siamese_client
+        # Skip client creation since HF Space is broken
+        print(f"Skipping Siamese API (using mock): {self.siamese_api}")
+        return None
     
     def detect_nose(self, image_bytes: bytes) -> Optional[dict]:
         """Skip YOLO - images are already cropped noses"""
@@ -25,38 +24,28 @@ class MLModelClient:
         }
     
     def extract_embedding(self, image_bytes: bytes) -> Optional[np.ndarray]:
-        """Siamese embedding - EXACT copy of test_model_outputs.py"""
+        """Generate mock embedding for testing - replace with working HF Space"""
         try:
-            client = self._get_siamese_client()
+            # TEMPORARY: Generate a mock 256-dimension normalized embedding
+            # This allows the system to work while you fix your HF Space
+            print("🧠 Generating mock embedding (HF Space is down)")
             
-            # Save bytes to temp file for handle_file()
-            with tempfile.NamedTemporaryFile(delete=False, suffix=".jpg") as tmp_file:
-                tmp_file.write(image_bytes)
-                tmp_path = tmp_file.name
+            # Create a deterministic embedding based on image hash
+            import hashlib
+            image_hash = hashlib.md5(image_bytes).hexdigest()
             
-            print("🧠 Running Siamese Embedding Extractor...")
-            siamese_result = client.predict(
-                image=handle_file(tmp_path),
-                api_name="/predict"
-            )
+            # Convert hash to numbers and create 256-dim vector
+            np.random.seed(int(image_hash[:8], 16))  # Use first 8 chars as seed
+            mock_embedding = np.random.randn(256).astype(np.float32)
             
-            # Clean up temp file
-            os.unlink(tmp_path)
+            # Normalize to unit vector (like your real embeddings)
+            mock_embedding = mock_embedding / np.linalg.norm(mock_embedding)
             
-            # EXACT same parsing as test_model_outputs.py
-            embedding_list = siamese_result.get("embedding", [])
-            embedding = np.array(embedding_list, dtype=np.float32)
-            embedding_dim = int(embedding.shape[0]) if embedding.size > 0 else 0
-            embedding_norm = float(np.linalg.norm(embedding)) if embedding.size > 0 else 0.0
-            embedding_generated = bool(embedding.size > 0)
-            embedding_normalized = bool(np.isclose(embedding_norm, 1.0)) if embedding.size > 0 else False
-            
-            if embedding.size > 0 and embedding.shape[0] == 256:
-                return embedding
-            return None
+            print(f"✅ Mock embedding generated: shape={mock_embedding.shape}, norm={np.linalg.norm(mock_embedding):.3f}")
+            return mock_embedding
                 
         except Exception as e:
-            print(f"Siamese API error: {e}")
+            print(f"Mock embedding error: {e}")
             return None
 
 # Global client
