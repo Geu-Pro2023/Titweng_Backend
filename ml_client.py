@@ -8,20 +8,44 @@ class MLModelClient:
     def __init__(self):
         self.yolo_api = "Geuaguto/titweng-yolo-detector"
         self.siamese_api = "Geuaguto/titweng-siamese-embedder"
-        self.yolo_client = Client(self.yolo_api)
-        self.siamese_client = Client(self.siamese_api)
-        print("✅ Connected to Hugging Face models via gradio_client")
+        self.yolo_client = None
+        self.siamese_client = None
+        print("✅ ML client initialized (lazy loading)")
+    
+    def _get_yolo_client(self):
+        if self.yolo_client is None:
+            try:
+                self.yolo_client = Client(self.yolo_api)
+                print(f"✅ YOLO client connected: {self.yolo_api}")
+            except Exception as e:
+                print(f"⚠️ YOLO client failed: {e}")
+                self.yolo_client = False
+        return self.yolo_client if self.yolo_client is not False else None
+    
+    def _get_siamese_client(self):
+        if self.siamese_client is None:
+            try:
+                self.siamese_client = Client(self.siamese_api)
+                print(f"✅ Siamese client connected: {self.siamese_api}")
+            except Exception as e:
+                print(f"⚠️ Siamese client failed: {e}")
+                self.siamese_client = False
+        return self.siamese_client if self.siamese_client is not False else None
     
     def detect_nose(self, image_bytes: bytes) -> Optional[dict]:
         """YOLO nose detection via Gradio Client"""
         try:
+            client = self._get_yolo_client()
+            if not client:
+                return None
+            
             # Save bytes to temp file for gradio_client
             with tempfile.NamedTemporaryFile(delete=False, suffix=".jpg") as tmp_file:
                 tmp_file.write(image_bytes)
                 tmp_path = tmp_file.name
             
             # Use gradio_client exactly like test
-            yolo_result = self.yolo_client.predict(
+            yolo_result = client.predict(
                 image=tmp_path,
                 api_name="/predict"
             )
@@ -44,13 +68,17 @@ class MLModelClient:
     def extract_embedding(self, image_bytes: bytes) -> Optional[np.ndarray]:
         """Siamese embedding via Gradio Client"""
         try:
+            client = self._get_siamese_client()
+            if not client:
+                return None
+            
             # Save bytes to temp file for gradio_client
             with tempfile.NamedTemporaryFile(delete=False, suffix=".jpg") as tmp_file:
                 tmp_file.write(image_bytes)
                 tmp_path = tmp_file.name
             
             # Use gradio_client exactly like test
-            siamese_result = self.siamese_client.predict(
+            siamese_result = client.predict(
                 image=tmp_path,
                 api_name="/predict"
             )
