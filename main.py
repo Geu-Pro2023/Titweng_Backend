@@ -443,42 +443,62 @@ async def test_ml_models(
     try:
         contents = await file.read()
         
-        # Test YOLO detector
+        # Test YOLO detector - exact same as test_model_outputs.py
         yolo_result = detect_nose(contents)
         
-        # Test Siamese embedder
-        if yolo_result:
-            embedding = extract_embedding(contents)
-            
-            return {
-                "success": True,
-                "yolo_detector": {
-                    "nose_detected": yolo_result is not None,
-                    "bbox": yolo_result.get('bbox') if yolo_result else None,
-                    "confidence": yolo_result.get('confidence') if yolo_result else None
-                },
-                "siamese_embedder": {
-                    "embedding_generated": embedding is not None,
-                    "embedding_dimension": len(embedding) if embedding is not None else 0,
-                    "embedding_type": str(type(embedding)),
-                    "embedding_sample": embedding[:5].tolist() if embedding is not None else None,
-                    "embedding_norm": float(np.linalg.norm(embedding)) if embedding is not None else 0,
-                    "embedding_normalized": bool(abs(np.linalg.norm(embedding) - 1.0) < 0.1) if embedding is not None else False
-                },
-                "database_compatibility": {
-                    "expected_dimension": 256,
-                    "dimension_match": len(embedding) == 256 if embedding is not None else False,
-                    "pgvector_format": '[' + ','.join(map(str, embedding[:3].tolist())) + '...]' if embedding is not None else None
-                }
+        # Test Siamese embedder - exact same as test_model_outputs.py
+        embedding = extract_embedding(contents)
+        
+        # EXACT same output format as test_model_outputs.py
+        nose_detected = bool(yolo_result.get("detected", False)) if yolo_result else False
+        bbox = yolo_result.get("bbox", []) if yolo_result else []
+        confidence = float(yolo_result.get("confidence", 0.0)) if yolo_result else 0.0
+        
+        embedding_generated = bool(embedding is not None and embedding.size > 0)
+        embedding_dim = int(embedding.shape[0]) if embedding is not None and embedding.size > 0 else 0
+        embedding_norm = float(np.linalg.norm(embedding)) if embedding is not None and embedding.size > 0 else 0.0
+        embedding_normalized = bool(np.isclose(embedding_norm, 1.0)) if embedding is not None and embedding.size > 0 else False
+        
+        dimension_match = embedding_dim == 256
+        pgvector_format = "[" + ",".join(map(str, embedding.tolist())) + "]" if embedding is not None and embedding.size > 0 else []
+        
+        return {
+            "success": embedding_generated,
+            "yolo_detector": {
+                "nose_detected": nose_detected,
+                "bbox": bbox,
+                "confidence": confidence
+            },
+            "siamese_embedder": {
+                "embedding_generated": embedding_generated,
+                "embedding_dimension": embedding_dim,
+                "embedding_type": str(type(embedding)) if embedding is not None else "None",
+                "embedding_sample": embedding[:5].tolist() if embedding is not None and embedding.size > 0 else [],
+                "embedding_norm": round(embedding_norm, 6),
+                "embedding_normalized": embedding_normalized
+            },
+            "database_compatibility": {
+                "expected_dimension": 256,
+                "dimension_match": dimension_match,
+                "pgvector_format": pgvector_format
             }
+        }
         else:
             return {
                 "success": False,
                 "error": "YOLO detector failed to detect nose",
                 "yolo_detector": {
                     "nose_detected": False,
-                    "bbox": None,
-                    "confidence": None
+                    "bbox": [],
+                    "confidence": 0.0
+                },
+                "siamese_embedder": {
+                    "embedding_generated": False,
+                    "embedding_dimension": 0,
+                    "embedding_type": "None",
+                    "embedding_sample": [],
+                    "embedding_norm": 0.0,
+                    "embedding_normalized": False
                 }
             }
             
