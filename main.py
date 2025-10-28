@@ -527,13 +527,17 @@ def health_check(db: Session = Depends(get_db)):
         health_status["database"] = f"failed: {str(e)}"
         health_status["status"] = "unhealthy"
     
-    # Test ML services
+    # Test ML services with direct HTTP call
     try:
-        siamese_client = ml_client._get_siamese_client()
-        if siamese_client:
+        import requests
+        response = requests.get(
+            "https://geuaguto-titweng-siamese-embedder.hf.space/api/predict",
+            timeout=10
+        )
+        if response.status_code in [200, 405]:  # 405 = Method Not Allowed (but Space is up)
             health_status["ml_services"]["siamese_api"] = "connected"
         else:
-            health_status["ml_services"]["siamese_api"] = "failed to connect"
+            health_status["ml_services"]["siamese_api"] = f"http_error: {response.status_code}"
             health_status["status"] = "degraded"
     except Exception as e:
         health_status["ml_services"]["siamese_api"] = f"error: {str(e)}"
