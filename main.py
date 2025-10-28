@@ -148,9 +148,13 @@ app.include_router(admin.router)
 def extract_embedding(image_bytes: bytes) -> np.ndarray:
     try:
         embedding = ml_client.extract_embedding(image_bytes)
-        if embedding is not None:
+        if embedding is not None and embedding.size > 0:
+            logger.info(f"✅ Embedding extracted successfully: {embedding.shape}")
             return embedding
+        logger.error("ML client returned None or empty embedding")
         raise HTTPException(status_code=503, detail="Failed to extract embedding")
+    except HTTPException:
+        raise  # Re-raise HTTP exceptions
     except Exception as e:
         logger.error(f"Embedding extraction failed: {e}")
         raise HTTPException(status_code=503, detail="Embedding service unavailable")
@@ -442,12 +446,13 @@ async def test_ml_models(
     """Diagnostic endpoint to test ML model outputs"""
     try:
         contents = await file.read()
+        logger.info(f"Testing ML models with file: {file.filename}, size: {len(contents)} bytes")
         
-        # Test YOLO detector - exact same as test_model_outputs.py
+        # Test YOLO detector (returns dummy result since images are pre-cropped)
         yolo_result = detect_nose(contents)
         
-        # Test Siamese embedder - exact same as test_model_outputs.py
-        embedding = extract_embedding(contents)
+        # Test Siamese embedder directly with ml_client (not through extract_embedding wrapper)
+        embedding = ml_client.extract_embedding(contents)
         
         # EXACT same output format as test_model_outputs.py
         nose_detected = bool(yolo_result.get("detected", False)) if yolo_result else False
@@ -485,12 +490,13 @@ async def test_ml_models(
         }
             
     except Exception as e:
+        logger.error(f"ML model test failed: {e}")
         return {
             "success": False,
             "error": str(e),
             "debug_info": {
                 "file_size": len(contents) if 'contents' in locals() else 0,
-                "file_type": file.content_type
+                "file_type": file.content_type if file else "unknown"
             }
         }
 
@@ -498,17 +504,42 @@ async def test_ml_models(
 # Health Check
 # ---------------------------
 @app.get("/health")
-def health_check():
-    return {
+def health_check(db: Session = Depends(get_db)):
+    health_status = {
         "status": "healthy",
-        "yolo_loaded": True,
-        "siamese_loaded": True,
+        "database": "unknown",
+        "ml_services": {
+            "siamese_api": "unknown"
+        },
         "email_available": FASTMAIL_AVAILABLE,
         "endpoints": {
             "admin": "/admin/*",
             "mobile": "/mobile/*"
         }
     }
+    
+    # Test database connection
+    try:
+        from sqlalchemy import text
+        db.execute(text("SELECT 1"))
+        health_status["database"] = "connected"
+    except Exception as e:
+        health_status["database"] = f"failed: {str(e)}"
+        health_status["status"] = "unhealthy"
+    
+    # Test ML services
+    try:
+        siamese_client = ml_client._get_siamese_client()
+        if siamese_client:
+            health_status["ml_services"]["siamese_api"] = "connected"
+        else:
+            health_status["ml_services"]["siamese_api"] = "failed to connect"
+            health_status["status"] = "degraded"
+    except Exception as e:
+        health_status["ml_services"]["siamese_api"] = f"error: {str(e)}"
+        health_status["status"] = "degraded"
+    
+    return health_status
 
 # ---------------------------
 # Email Test Endpoint
