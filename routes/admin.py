@@ -75,6 +75,8 @@ async def admin_register_new_cow(
         
         # Extract embedding for duplicate check
         emb = main.extract_embedding(contents)
+        if emb is None:
+            raise HTTPException(status_code=400, detail=f"Failed to extract embedding from {f.filename}")
         emb_str = '[' + ','.join(map(str, emb.tolist())) + ']'
         
         # Check for duplicates using pgvector (much faster)
@@ -102,6 +104,8 @@ async def admin_register_new_cow(
         contents = await f.read()
         nose_result = main.detect_nose(contents)
         emb = main.extract_embedding(contents)
+        if emb is None:
+            raise HTTPException(status_code=400, detail=f"Failed to extract embedding from {f.filename}")
         
         embeddings_data.append({
             "embedding": emb.tolist(),
@@ -472,6 +476,8 @@ async def admin_verify_cow_by_nose(
         
         # Extract embedding using HF API
         query_emb = main.extract_embedding(contents)
+        if query_emb is None:
+            continue  # Skip this file if embedding extraction failed
         
         # Use pgvector for efficient similarity search
         from sqlalchemy import text

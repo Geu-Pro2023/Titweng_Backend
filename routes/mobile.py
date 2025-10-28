@@ -41,6 +41,8 @@ async def verify_cow_by_nose(
         
         # Extract embedding using HF API
         query_emb = main.extract_embedding(contents)
+        if query_emb is None:
+            continue  # Skip this file if embedding extraction failed
         
         # Use pgvector for efficient similarity search
         from sqlalchemy import text
@@ -222,6 +224,13 @@ async def verify_cow_live_camera(
     
     # Extract embedding using HF API
     query_emb = main.extract_embedding(contents)
+    if query_emb is None:
+        return {
+            "nose_detected": True,
+            "detection_confidence": round(detection_confidence, 3),
+            "cow_found": False,
+            "message": "Failed to extract embedding from image"
+        }
     
     # Use pgvector for efficient similarity search
     from sqlalchemy import text
