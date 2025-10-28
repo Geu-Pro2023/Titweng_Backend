@@ -173,20 +173,23 @@ def detect_nose(image_bytes: bytes) -> Optional[dict]:
 # Email Configuration
 # ---------------------------
 # Use port 465 with SSL for better Gmail compatibility
-mail_config = ConnectionConfig(
-    MAIL_USERNAME=os.getenv("SMTP_FROM_EMAIL", "g.bior@alustudent.com").replace("mailto:", ""),
-    MAIL_PASSWORD=os.getenv("SMTP_PASSWORD", ""),
-    MAIL_FROM=os.getenv("SMTP_FROM_EMAIL", "g.bior@alustudent.com").replace("mailto:", ""),
-    MAIL_PORT=465,  # Use SSL port instead of STARTTLS
-    MAIL_SERVER="smtp.gmail.com",
-    MAIL_FROM_NAME=os.getenv("SMTP_FROM_NAME", "Titweng Cattle System"),
-    MAIL_STARTTLS=False,
-    MAIL_SSL_TLS=True,  # Use SSL instead of STARTTLS
-    USE_CREDENTIALS=True,
-    VALIDATE_CERTS=True
-)
+mail_config = None
+fastmail = None
 
-fastmail = FastMail(mail_config) if FASTMAIL_AVAILABLE else None
+if FASTMAIL_AVAILABLE:
+    mail_config = ConnectionConfig(
+        MAIL_USERNAME=os.getenv("SMTP_FROM_EMAIL", "g.bior@alustudent.com").replace("mailto:", ""),
+        MAIL_PASSWORD=os.getenv("SMTP_PASSWORD", ""),
+        MAIL_FROM=os.getenv("SMTP_FROM_EMAIL", "g.bior@alustudent.com").replace("mailto:", ""),
+        MAIL_PORT=465,  # Use SSL port instead of STARTTLS
+        MAIL_SERVER="smtp.gmail.com",
+        MAIL_FROM_NAME=os.getenv("SMTP_FROM_NAME", "Titweng Cattle System"),
+        MAIL_STARTTLS=False,
+        MAIL_SSL_TLS=True,  # Use SSL instead of STARTTLS
+        USE_CREDENTIALS=True,
+        VALIDATE_CERTS=True
+    )
+    fastmail = FastMail(mail_config)
 
 async def send_email(recipient_email: str, subject: str, body: str, pdf_path: Optional[str] = None):
     if not FASTMAIL_AVAILABLE or not fastmail:
