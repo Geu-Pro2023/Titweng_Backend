@@ -25,87 +25,88 @@ class MLModelClient:
         }
     
     def extract_embedding(self, image_bytes: bytes) -> Optional[np.ndarray]:
-        """Siamese embedding with direct HTTP API call to force JSON"""
+        """Direct HTTP API call to HF Space - bypasses Gradio Client HTML issues"""
         try:
-            # Try Gradio client first
-            try:
-                client = self._get_siamese_client()
-                
-                # Save bytes to temp file for handle_file()
-                with tempfile.NamedTemporaryFile(delete=False, suffix=".jpg") as tmp_file:
-                    tmp_file.write(image_bytes)
-                    tmp_path = tmp_file.name
-                
-                print("🧠 Running Siamese Embedding Extractor...")
-                siamese_result = client.predict(
-                    image=handle_file(tmp_path),
-                    api_name="/predict"
-                )
-                
-                # Clean up temp file
-                os.unlink(tmp_path)
-                
-                # Handle your actual HF Space format
-                print(f"Raw result: {siamese_result}")
-                
-                # Your Space returns the embedding directly, not in a dict
-                if isinstance(siamese_result, dict) and "embedding" in siamese_result:
-                    embedding_list = siamese_result["embedding"]
-                elif isinstance(siamese_result, list) and len(siamese_result) > 0:
-                    embedding_list = siamese_result
-                else:
-                    print(f"Unexpected result format: {type(siamese_result)}")
-                    return None
-                
-                embedding = np.array(embedding_list, dtype=np.float32)
-                print(f"Embedding shape: {embedding.shape}")
-                
-                if embedding.size > 0 and embedding.shape[0] == 256:
-                    print("✅ Valid embedding extracted")
-                    return embedding
-                    
-            except Exception as gradio_error:
-                print(f"Gradio client failed: {gradio_error}")
-                
-                # Fallback: Direct HTTP API call with proper headers
-                print("🔄 Trying direct HTTP API call...")
-                import requests
-                import base64
-                
-                # Convert image to base64
-                image_b64 = base64.b64encode(image_bytes).decode()
-                
-                # Direct API call with JSON headers
-                response = requests.post(
-                    "https://geuaguto-titweng-siamese-embedder.hf.space/api/predict",
-                    json={
-                        "data": [f"data:image/jpeg;base64,{image_b64}"]
-                    },
-                    headers={
-                        "Content-Type": "application/json",
-                        "Accept": "application/json"
-                    },
-                    timeout=30
-                )
-                
-                if response.status_code == 200:
-                    result = response.json()
-                    if "data" in result and len(result["data"]) > 0:
-                        embedding_data = result["data"][0]
-                        if "embedding" in embedding_data:
-                            embedding_list = embedding_data["embedding"]
-                            embedding = np.array(embedding_list, dtype=np.float32)
-                            
-                            if embedding.size > 0 and embedding.shape[0] == 256:
-                                print("✅ HTTP API call successful")
-                                return embedding
-                
-                print(f"HTTP API failed: {response.status_code} - {response.text[:200]}")
+            print("🧠 Running Siamese Embedding Extractor (Direct HTTP)...")
+            import requests
+            import base64
             
+            # Convert image to base64
+            image_b64 = base64.b64encode(image_bytes).decode()
+            
+            # Try multiple API endpoints
+            endpoints = [
+                "https://geuaguto-titweng-siamese-embedder.hf.space/api/predict",
+                "https://geuaguto-titweng-siamese-embedder.hf.space/run/predict",
+                "https://geuaguto-titweng-siamese-embedder.hf.space/call/predict"
+            ]
+            
+            for endpoint in endpoints:
+                try:
+                    print(f"Trying endpoint: {endpoint}")
+                    
+                    # Direct API call with proper Gradio format
+                    response = requests.post(
+                        endpoint,
+                        json={
+                            "data": [f"data:image/jpeg;base64,{image_b64}"]
+                        },
+                        headers={
+                            "Content-Type": "application/json",
+                            "Accept": "application/json"
+                        },
+                        timeout=30
+                    )
+                    
+                    print(f"Response status: {response.status_code}")
+                    print(f"Response headers: {dict(response.headers)}")
+                    
+                    if response.status_code == 200:
+                        try:
+                            result = response.json()
+                            print(f"JSON result: {result}")
+                            
+                            # Handle different response formats
+                            embedding_list = None
+                            
+                            # Format 1: {"data": [{"embedding": [...]}]}
+                            if "data" in result and len(result["data"]) > 0:
+                                data_item = result["data"][0]
+                                if isinstance(data_item, dict) and "embedding" in data_item:
+                                    embedding_list = data_item["embedding"]
+                                elif isinstance(data_item, list):
+                                    embedding_list = data_item
+                            
+                            # Format 2: {"embedding": [...]}
+                            elif "embedding" in result:
+                                embedding_list = result["embedding"]
+                            
+                            # Format 3: Direct list
+                            elif isinstance(result, list):
+                                embedding_list = result
+                            
+                            if embedding_list and len(embedding_list) == 256:
+                                embedding = np.array(embedding_list, dtype=np.float32)
+                                print(f"✅ Embedding extracted: shape={embedding.shape}, norm={np.linalg.norm(embedding):.3f}")
+                                return embedding
+                            else:
+                                print(f"Invalid embedding: {len(embedding_list) if embedding_list else 0} dimensions")
+                                
+                        except Exception as json_error:
+                            print(f"JSON parsing failed: {json_error}")
+                            print(f"Raw response: {response.text[:500]}")
+                    else:
+                        print(f"HTTP error: {response.status_code} - {response.text[:200]}")
+                        
+                except Exception as endpoint_error:
+                    print(f"Endpoint {endpoint} failed: {endpoint_error}")
+                    continue
+            
+            print("❌ All API endpoints failed")
             return None
                 
         except Exception as e:
-            print(f"All embedding methods failed: {e}")
+            print(f"Complete embedding extraction failed: {e}")
             return None
 
 # Global client
