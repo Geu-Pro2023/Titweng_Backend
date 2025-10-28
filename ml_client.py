@@ -12,8 +12,24 @@ class MLModelClient:
 
     def _get_siamese_client(self):
         if self.siamese_client is None:
-            print(f"Loaded Siamese API: {self.siamese_api} ✔")
-            self.siamese_client = Client(self.siamese_api)
+            print(f"Loading Siamese API: {self.siamese_api}...")
+            
+            # Try multiple times - HF Spaces can be slow to wake up
+            for attempt in range(3):
+                try:
+                    print(f"Attempt {attempt + 1}/3 to connect to HF Space...")
+                    self.siamese_client = Client(self.siamese_api)
+                    print(f"✅ Siamese API loaded successfully!")
+                    break
+                except Exception as e:
+                    print(f"❌ Attempt {attempt + 1} failed: {e}")
+                    if attempt < 2:  # Don't sleep on last attempt
+                        import time
+                        print("Waiting 5 seconds before retry...")
+                        time.sleep(5)
+                    else:
+                        print("All attempts failed - HF Space may be down")
+                        raise
         return self.siamese_client
     
     def detect_nose(self, image_bytes: bytes) -> Optional[dict]:
