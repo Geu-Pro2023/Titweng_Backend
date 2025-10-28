@@ -26,8 +26,10 @@ class MLModelClient:
     
     def extract_embedding(self, image_bytes: bytes) -> Optional[np.ndarray]:
         """Use Gradio Client like your working local test"""
+        tmp_path = None
         try:
             print("🧠 Running Siamese Embedding Extractor...")
+            print(f"Image size: {len(image_bytes)} bytes")
             
             # Use Gradio Client (same as your working test)
             client = self._get_siamese_client()
@@ -37,43 +39,53 @@ class MLModelClient:
                 tmp_file.write(image_bytes)
                 tmp_path = tmp_file.name
             
-            try:
-                # EXACT same call as your working test
-                siamese_result = client.predict(
-                    image=handle_file(tmp_path),
-                    api_name="/predict"
-                )
-                
-                print(f"Raw result: {siamese_result}")
-                print(f"Result type: {type(siamese_result)}")
-                
-                # Handle your Space's actual format
-                embedding_list = None
-                
-                if isinstance(siamese_result, dict):
-                    if "embedding" in siamese_result:
-                        embedding_list = siamese_result["embedding"]
-                    elif "data" in siamese_result:
-                        embedding_list = siamese_result["data"]
-                elif isinstance(siamese_result, list):
-                    embedding_list = siamese_result
-                
-                if embedding_list and len(embedding_list) == 256:
-                    embedding = np.array(embedding_list, dtype=np.float32)
-                    print(f"✅ Embedding extracted: shape={embedding.shape}, norm={np.linalg.norm(embedding):.3f}")
-                    return embedding
-                else:
-                    print(f"Invalid embedding format: {len(embedding_list) if embedding_list else 0} dimensions")
-                    return None
-                    
-            finally:
-                # Clean up temp file
-                if os.path.exists(tmp_path):
-                    os.unlink(tmp_path)
+            print(f"Temp file created: {tmp_path}")
+            
+            # EXACT same call as your working test
+            print("Calling HF Space...")
+            siamese_result = client.predict(
+                image=handle_file(tmp_path),
+                api_name="/predict"
+            )
+            
+            print(f"✅ HF Space responded successfully")
+            print(f"Raw result: {siamese_result}")
+            print(f"Result type: {type(siamese_result)}")
+            
+            # Handle your Space's actual format
+            embedding_list = None
+            
+            if isinstance(siamese_result, dict):
+                print(f"Dict keys: {list(siamese_result.keys())}")
+                if "embedding" in siamese_result:
+                    embedding_list = siamese_result["embedding"]
+                elif "data" in siamese_result:
+                    embedding_list = siamese_result["data"]
+            elif isinstance(siamese_result, list):
+                embedding_list = siamese_result
+            else:
+                print(f"⚠️ Unexpected result type: {type(siamese_result)}")
+            
+            if embedding_list and len(embedding_list) == 256:
+                embedding = np.array(embedding_list, dtype=np.float32)
+                print(f"✅ Embedding extracted: shape={embedding.shape}, norm={np.linalg.norm(embedding):.3f}")
+                return embedding
+            else:
+                print(f"❌ Invalid embedding format: {len(embedding_list) if embedding_list else 0} dimensions")
+                print(f"Embedding sample: {embedding_list[:5] if embedding_list else 'None'}")
+                return None
                 
         except Exception as e:
-            print(f"Siamese API error: {e}")
+            print(f"❌ Siamese API error: {e}")
+            print(f"Error type: {type(e)}")
+            import traceback
+            print(f"Full traceback: {traceback.format_exc()}")
             return None
+        finally:
+            # Clean up temp file
+            if tmp_path and os.path.exists(tmp_path):
+                os.unlink(tmp_path)
+                print(f"Cleaned up temp file: {tmp_path}")
 
 # Global client
 ml_client = MLModelClient()
