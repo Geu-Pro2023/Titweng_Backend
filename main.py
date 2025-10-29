@@ -266,6 +266,17 @@ def generate_receipt_pdf(meta:Dict[str,Any], qr_path:Optional[str], logo_path:Op
 def admin_login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
     import bcrypt
     
+    user = db.query(User).filter(User.username == form_data.username).first()
+    if not user or user.role != "admin":
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+    
+    if not bcrypt.checkpw(form_data.password.encode('utf-8'), user.password_hash.encode('utf-8')):
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+    
+    token = create_access_token({"sub": user.username, "role": user.role})
+    return {"access_token": token, "token_type": "bearer"}Auth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
+    import bcrypt
+    
     # Log the login attempt
     logger.info(f"Login attempt for username: {form_data.username}")
     

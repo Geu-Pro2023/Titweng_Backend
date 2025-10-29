@@ -16,8 +16,8 @@ except Exception:
 
 # Removed Siamese Network class - using HF APIs
 
-# Import ML client for external API calls
-from ml_client import ml_client
+# Import LOCAL ML client for trained Siamese model
+from ml_client_local import ml_client
 
 # Removed image preprocessing - using HF APIs
 
