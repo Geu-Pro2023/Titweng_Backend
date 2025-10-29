@@ -87,7 +87,19 @@ async def lifespan(app: FastAPI):
         
         logger.info("Creating database tables...")
         Base.metadata.create_all(bind=engine)  # Create tables if they don't exist
-        logger.info("✅ Database tables created successfully")
+        logger.info("✅ Database setup completed")
+        
+        # Add facial_image_path column if it doesn't exist
+        logger.info("Checking for facial_image_path column...")
+        with engine.begin() as conn:
+            try:
+                conn.execute(text("ALTER TABLE cows ADD COLUMN facial_image_path TEXT;"))
+                logger.info("✅ Added facial_image_path column")
+            except Exception as e:
+                if "already exists" in str(e) or "duplicate column" in str(e):
+                    logger.info("✅ facial_image_path column already exists")
+                else:
+                    logger.warning(f"Column migration warning: {e}")
         
         # Create admin user if not exists
         db = SessionLocal()
