@@ -116,7 +116,7 @@ async def lifespan(app: FastAPI):
         logger.error(f"Database URL: {os.getenv('DATABASE_URL', 'Not set')}")
         # Continue without database setup - will fail on first request
     
-    logger.info("✅ Using Hugging Face models")
+    logger.info("✅ Using local trained Siamese model")
     yield
     logger.info("Shutting down...")
 
@@ -530,20 +530,17 @@ def health_check(db: Session = Depends(get_db)):
         health_status["database"] = f"failed: {str(e)}"
         health_status["status"] = "unhealthy"
     
-    # Test ML services with direct HTTP call
+    # Test local ML model
     try:
-        import requests
-        response = requests.get(
-            "https://geuaguto-titweng-siamese-embedder.hf.space/api/predict",
-            timeout=10
-        )
-        if response.status_code in [200, 405]:  # 405 = Method Not Allowed (but Space is up)
-            health_status["ml_services"]["siamese_api"] = "connected"
+        # Test if model can load and process
+        test_embedding = ml_client.extract_embedding(b"dummy_test")
+        if test_embedding is not None:
+            health_status["ml_services"]["siamese_api"] = "local_model_ready"
         else:
-            health_status["ml_services"]["siamese_api"] = f"http_error: {response.status_code}"
+            health_status["ml_services"]["siamese_api"] = "local_model_failed"
             health_status["status"] = "degraded"
     except Exception as e:
-        health_status["ml_services"]["siamese_api"] = f"error: {str(e)}"
+        health_status["ml_services"]["siamese_api"] = f"local_model_error: {str(e)}"
         health_status["status"] = "degraded"
     
     return health_status
