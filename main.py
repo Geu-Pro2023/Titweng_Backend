@@ -274,45 +274,6 @@ def admin_login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = 
         raise HTTPException(status_code=401, detail="Invalid credentials")
     
     token = create_access_token({"sub": user.username, "role": user.role})
-    return {"access_token": token, "token_type": "bearer"}Auth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
-    import bcrypt
-    
-    # Log the login attempt
-    logger.info(f"Login attempt for username: {form_data.username}")
-    
-    # Find admin user
-    user = db.query(User).filter(User.username == form_data.username).first()
-    if not user:
-        logger.warning(f"User not found: {form_data.username}")
-        raise HTTPException(status_code=401, detail="Invalid credentials")
-    
-    if user.role != "admin":
-        logger.warning(f"Non-admin login attempt: {form_data.username}")
-        raise HTTPException(status_code=401, detail="Invalid credentials")
-    
-    # Verify password
-    password_valid = False
-    try:
-        password_valid = bcrypt.checkpw(form_data.password.encode('utf-8'), user.password_hash.encode('utf-8'))
-        logger.info(f"Password verification result: {password_valid}")
-    except Exception as e:
-        logger.error(f"Password verification error: {e}")
-        try:
-            from passlib.context import CryptContext
-            pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-            password_valid = pwd_context.verify(form_data.password, user.password_hash)
-            logger.info(f"Passlib verification result: {password_valid}")
-        except Exception as e2:
-            logger.error(f"Passlib verification error: {e2}")
-    
-    if not password_valid:
-        logger.warning(f"Invalid password for user: {form_data.username}")
-        raise HTTPException(status_code=401, detail="Invalid credentials")
-    
-    # Create token
-    token = create_access_token({"sub": user.username, "role": user.role})
-    logger.info(f"Login successful for: {form_data.username}")
-    
     return {"access_token": token, "token_type": "bearer"}
 
 # ---------------------------
