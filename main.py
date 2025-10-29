@@ -121,6 +121,7 @@ async def lifespan(app: FastAPI):
     logger.info("Shutting down...")
 
 app = FastAPI(title="Cattle Nose Recognition API", version="2.0", lifespan=lifespan)
+# Using trained Siamese model
 
 # ---------------------------
 # Middleware
