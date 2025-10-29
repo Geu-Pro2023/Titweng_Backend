@@ -498,8 +498,8 @@ async def admin_verify_cow_by_nose(
         best_similarity = result.similarity if result else 0
         best_cow_id = result.cow_id if result else None
         
-        # Require VERY high similarity for 100k+ scale (95%+)
-        if best_similarity > 0.95:  # Ultra-strict threshold for large scale
+        # Require high similarity for verification (85%+)
+        if best_similarity > 0.85:  # Practical threshold for real-world use
             cow = db.query(Cow).filter(Cow.cow_id == best_cow_id).first()
             verified_status = "yes" if best_similarity > 0.97 else "partial"
             
