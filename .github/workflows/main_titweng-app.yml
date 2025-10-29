@@ -54,7 +54,7 @@ jobs:
       - name: 'Azure CLI Login'
         uses: azure/login@v1
         with:
-          publish-profile: ${{ secrets.AZUREAPPSERVICE_PUBLISHPROFILE_77BB1540D06A42A18C73758068D150FF }}
+          creds: ${{ secrets.AZUREAPPSERVICE_PUBLISHPROFILE_77BB1540D06A42A18C73758068D150FF }}
       
       - name: 'Restart Azure Web App'
         run: az webapp restart --name titweng-app --resource-group titweng-rg
