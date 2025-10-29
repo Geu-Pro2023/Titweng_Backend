@@ -51,14 +51,6 @@ jobs:
         with:
           name: python-app
       
-      - name: 'Restart Azure Web App'
-        uses: azure/webapps-deploy@v3
-        with:
-          app-name: 'titweng-app'
-          slot-name: 'Production'
-          publish-profile: ${{ secrets.AZUREAPPSERVICE_PUBLISHPROFILE_77BB1540D06A42A18C73758068D150FF }}
-          restart: true
-          
       - name: 'Deploy to Azure Web App'
         uses: azure/webapps-deploy@v3
         id: deploy-to-webapp
@@ -66,3 +58,5 @@ jobs:
           app-name: 'titweng-app'
           slot-name: 'Production'
           publish-profile: ${{ secrets.AZUREAPPSERVICE_PUBLISHPROFILE_77BB1540D06A42A18C73758068D150FF }}
+          package: '.'
+          clean: true
