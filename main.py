@@ -59,8 +59,8 @@ logger = logging.getLogger(__name__)
 # ---------------------------
 REGISTRATION_CONFIG = {"min_images": 3, "max_images": 5}
 
-# Import ML client for Hugging Face models
-from ml_client import ml_client
+# Import LOCAL ML client for trained Siamese model
+from ml_client_local import ml_client
 
 # ---------------------------
 # FastAPI Lifespan
