@@ -16,5 +16,5 @@ twilio==8.10.3
 pgvector==0.2.4
 fastapi-mail==1.4.1
 pydantic==2.5.0
-torch==1.13.1
-torchvision==0.14.1
+torch==2.0.1
+torchvision==0.15.2
