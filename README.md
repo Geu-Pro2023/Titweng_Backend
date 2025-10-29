@@ -62,8 +62,3 @@ pip install -r requirements.txt
 python create_admin.py
 uvicorn main:app --reload
 ```
-
-## Admin Credentials
-
-- Username: `titweng`
-- Password: `titweng@2025`
