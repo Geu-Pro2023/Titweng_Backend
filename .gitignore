@@ -24,10 +24,6 @@ __pycache__/
 .DS_Store
 Thumbs.db
 
-# Large files
-*.zip
-*.tar.gz
-
 # Logs
 *.log
 
@@ -35,6 +31,6 @@ Thumbs.db
 *.db
 *.sqlite3
 
-# Test files
-test_*.py
-*_test.py
+# Static files
+static/
+logs/
