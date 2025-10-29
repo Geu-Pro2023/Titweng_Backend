@@ -37,6 +37,7 @@ class Cow(Base):
     ownership_status = Column(String(20), default="original")  # original, transferred
     transfer_date = Column(TIMESTAMP)  # Date of ownership transfer
     previous_owner_id = Column(Integer)  # Previous owner for transfer history
+    facial_image_path = Column(Text)  # Path to cow facial image for verification
 
     owner = relationship("Owner", back_populates="cows")
     embeddings = relationship("Embedding", back_populates="cow")

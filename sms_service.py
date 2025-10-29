@@ -28,19 +28,7 @@ def send_verification_alert_sms(owner_phone: str, cow_tag: str, location: str = 
         
         # Create message
         location_text = f" at {location}" if location else ""
-        message_body = f"""
-🐄 TITWENG ALERT
-
-Your cow {cow_tag} is being verified{location_text}.
-
-Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
-
-If this is NOT you, please call Titweng immediately:
-📞 {titweng_contact}
-
-Stay secure!
-- Titweng Team
-        """.strip()
+        message_body = f"Hello, your cow {cow_tag} is being verified right now{location_text}. If this is you, ignore this message. If NOT you, call Titweng: +250792104851 for help."
         
         # Send SMS
         message = client.messages.create(

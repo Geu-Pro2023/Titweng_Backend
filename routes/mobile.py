@@ -118,13 +118,14 @@ async def verify_cow_by_nose(
             
             cow = db.query(Cow).filter(Cow.cow_id == best_match).first()
             
-            # Send SMS alert to owner (disabled until Twilio configured)
-            # if cow.owner and cow.owner.phone:
-            #     send_verification_alert_sms(
-            #         owner_phone=cow.owner.phone,
-            #         cow_tag=cow.cow_tag,
-            #         location="Mobile App Verification"
-            #     )
+            # Send SMS alert to owner
+            owner_notified = False
+            if cow.owner and cow.owner.phone:
+                owner_notified = send_verification_alert_sms(
+                    owner_phone=cow.owner.phone,
+                    cow_tag=cow.cow_tag,
+                    location="Mobile App Verification"
+                )
             
             print(f"✅ VERIFICATION SUCCESS: Cow {cow.cow_tag} identified with {best_similarity:.3f} confidence")
             
@@ -142,9 +143,10 @@ async def verify_cow_by_nose(
                     "color": cow.color,
                     "age": cow.age,
                     "owner_name": cow.owner.full_name if cow.owner else None,
-                    "owner_phone": cow.owner.phone if cow.owner else None
+                    "owner_phone": cow.owner.phone if cow.owner else None,
+                    "facial_image_url": f"/{cow.facial_image_path}" if cow.facial_image_path else None
                 },
-                "owner_notified": bool(cow.owner and cow.owner.phone)
+                "owner_notified": owner_notified
             }
         else:
             print(f"❌ VERIFICATION FAILED: No match found (best: {best_similarity:.3f}, threshold: {VERIFICATION_THRESHOLD})")
@@ -319,14 +321,14 @@ async def verify_cow_live_camera(
     if best_similarity > 0.85:
         cow = db.query(Cow).filter(Cow.cow_id == best_cow_id).first()
         
-        # Send SMS alert to owner (disabled until Twilio configured)
+        # Send SMS alert to owner
         owner_notified = False
-        # if cow.owner and cow.owner.phone:
-        #     owner_notified = send_verification_alert_sms(
-        #         owner_phone=cow.owner.phone,
-        #         cow_tag=cow.cow_tag,
-        #         location="Live Camera Verification"
-        #     )
+        if cow.owner and cow.owner.phone:
+            owner_notified = send_verification_alert_sms(
+                owner_phone=cow.owner.phone,
+                cow_tag=cow.cow_tag,
+                location="Live Camera Verification"
+            )
         
         return {
             "nose_detected": True,
@@ -340,7 +342,8 @@ async def verify_cow_live_camera(
                 "cow_tag": cow.cow_tag,
                 "breed": cow.breed,
                 "color": cow.color,
-                "owner_name": cow.owner.full_name if cow.owner else None
+                "owner_name": cow.owner.full_name if cow.owner else None,
+                "facial_image_url": f"/{cow.facial_image_path}" if cow.facial_image_path else None
             }
         }
     else:

@@ -9,6 +9,7 @@ import numpy as np
 from PIL import Image
 # Removed torch dependencies - using HF APIs
 from fastapi import FastAPI, UploadFile, File, Form, BackgroundTasks, Depends, HTTPException
+from fastapi.staticfiles import StaticFiles
 
 #from utils import detect_nose, preprocess_image, extract_embedding, generate_qr_code, generate_receipt_pdf, yolo_model, siamese_model
 
@@ -140,6 +141,9 @@ app.add_middleware(
 from routes import mobile, admin
 app.include_router(mobile.router)
 app.include_router(admin.router)
+
+# Mount static files for serving images
+app.mount("/static", StaticFiles(directory="static"), name="static")
 
 # ---------------------------
 # ML Utilities

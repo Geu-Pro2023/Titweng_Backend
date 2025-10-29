@@ -38,8 +38,10 @@ async def admin_register_new_cow(
     breed: str = Form(...),
     color: str = Form(...),
     age: int = Form(...),
-    # Nose Print Images (5 required)
+    # Nose Print Images (3 required)
     files: List[UploadFile] = File(...),
+    # Cow Facial Image (1 required)
+    facial_image: UploadFile = File(...),
     db: Session = Depends(get_db),
     current_admin=Depends(get_current_admin)
 ):
@@ -151,6 +153,15 @@ async def admin_register_new_cow(
     db.add(cow)
     db.commit()
     db.refresh(cow)
+    
+    # Process and save facial image with watermark
+    from image_utils import save_facial_image
+    facial_contents = await facial_image.read()
+    facial_path = save_facial_image(facial_contents, cow.cow_id, cow_tag)
+    
+    if facial_path:
+        cow.facial_image_path = facial_path
+        db.commit()
 
     # Save embeddings
     for emb_data in embeddings_data:
@@ -548,6 +559,15 @@ async def admin_verify_cow_by_nose(
             cow = db.query(Cow).filter(Cow.cow_id == best_cow_id).first()
             verified_status = "yes" if best_similarity > 0.90 else "partial"
             
+            # Send SMS alert to owner
+            owner_notified = False
+            if cow.owner and cow.owner.phone:
+                owner_notified = send_verification_alert_sms(
+                    owner_phone=cow.owner.phone,
+                    cow_tag=cow.cow_tag,
+                    location=location or "Admin Dashboard"
+                )
+            
             # Log verification
             log = VerificationLog(
                 user_id=None,
@@ -572,8 +592,10 @@ async def admin_verify_cow_by_nose(
                     "cow_tag": cow.cow_tag,
                     "breed": cow.breed,
                     "color": cow.color,
-                    "owner_name": cow.owner.full_name if cow.owner else None
-                }
+                    "owner_name": cow.owner.full_name if cow.owner else None,
+                    "facial_image_url": f"/{cow.facial_image_path}" if cow.facial_image_path else None
+                },
+                "owner_notified": owner_notified
             }
         else:
             result = {
