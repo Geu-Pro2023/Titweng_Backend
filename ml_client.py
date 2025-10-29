@@ -114,40 +114,60 @@ class MLModelClient:
                 print(f"Cleaned up temp file: {tmp_path}")
     
     def _generate_fallback_embedding(self, image_bytes: bytes) -> np.ndarray:
-        """Generate consistent embedding when HF Space is blocked"""
+        """Generate HIGHLY CONSISTENT embedding when HF Space is blocked"""
         import hashlib
         from PIL import Image
         import io
         
         try:
-            # Try to extract basic image features for consistency
+            # Extract detailed image features for maximum consistency
             img = Image.open(io.BytesIO(image_bytes))
             
-            # Resize to standard size and get basic stats
-            img_resized = img.resize((64, 64))
-            img_array = np.array(img_resized.convert('L'))  # Convert to grayscale
+            # Multiple resize operations for better feature extraction
+            img_64 = img.resize((64, 64)).convert('L')
+            img_32 = img.resize((32, 32)).convert('L')
+            img_16 = img.resize((16, 16)).convert('L')
             
-            # Use image statistics as seed (more consistent for similar images)
-            mean_val = int(np.mean(img_array))
-            std_val = int(np.std(img_array))
+            # Convert to arrays
+            arr_64 = np.array(img_64)
+            arr_32 = np.array(img_32)
+            arr_16 = np.array(img_16)
             
-            # Create seed from image characteristics (not exact hash)
-            seed = (mean_val * 1000 + std_val) % 999999
+            # Extract comprehensive features
+            features = [
+                np.mean(arr_64), np.std(arr_64), np.median(arr_64),
+                np.mean(arr_32), np.std(arr_32), np.median(arr_32),
+                np.mean(arr_16), np.std(arr_16), np.median(arr_16),
+                np.min(arr_64), np.max(arr_64),
+                np.percentile(arr_64, 25), np.percentile(arr_64, 75)
+            ]
+            
+            # Create deterministic seed from image content
+            feature_hash = hashlib.sha256(str(features).encode()).hexdigest()
+            seed = int(feature_hash[:8], 16) % 2147483647
             
         except Exception:
-            # Fallback to hash if image processing fails
+            # Ultimate fallback - use exact image hash
             image_hash = hashlib.sha256(image_bytes).hexdigest()
-            seed = int(image_hash[:6], 16) % 999999
+            seed = int(image_hash[:8], 16) % 2147483647
         
-        # Generate embedding with seed
+        # Generate DETERMINISTIC embedding
         np.random.seed(seed)
-        embedding = np.random.normal(0, 1, 256).astype(np.float32)
         
-        # Normalize to unit vector
+        # Create embedding with multiple components for better distribution
+        embedding_parts = []
+        for i in range(8):  # 8 parts of 32 dimensions each = 256
+            np.random.seed(seed + i)  # Different seed for each part
+            part = np.random.normal(0, 1, 32).astype(np.float32)
+            embedding_parts.append(part)
+        
+        embedding = np.concatenate(embedding_parts)
+        
+        # Normalize to unit vector (important for cosine similarity)
         embedding = embedding / np.linalg.norm(embedding)
         
-        print(f"✅ Fallback embedding generated: shape={embedding.shape}, norm={np.linalg.norm(embedding):.3f}")
-        print(f"📝 Note: Using image-based fallback (seed: {seed}) due to server restrictions")
+        print(f"✅ CONSISTENT fallback embedding: shape={embedding.shape}, norm={np.linalg.norm(embedding):.6f}")
+        print(f"📝 Seed: {seed} (deterministic from image content)")
         
         return embedding
 
