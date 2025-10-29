@@ -51,14 +51,6 @@ jobs:
         with:
           name: python-app
       
-      - name: 'Azure CLI Login'
-        uses: azure/login@v1
-        with:
-          creds: ${{ secrets.AZUREAPPSERVICE_PUBLISHPROFILE_77BB1540D06A42A18C73758068D150FF }}
-      
-      - name: 'Restart Azure Web App'
-        run: az webapp restart --name titweng-app --resource-group titweng-rg
-      
       - name: 'Deploy to Azure Web App'
         uses: azure/webapps-deploy@v3
         id: deploy-to-webapp
@@ -68,3 +60,4 @@ jobs:
           publish-profile: ${{ secrets.AZUREAPPSERVICE_PUBLISHPROFILE_77BB1540D06A42A18C73758068D150FF }}
           package: '.'
           clean: true
+          timeout: 600000
