@@ -60,4 +60,4 @@ jobs:
           publish-profile: ${{ secrets.AZUREAPPSERVICE_PUBLISHPROFILE_77BB1540D06A42A18C73758068D150FF }}
           package: '.'
           clean: true
-          timeout: 600000
+          restart: true
