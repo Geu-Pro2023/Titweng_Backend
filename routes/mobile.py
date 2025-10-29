@@ -44,27 +44,48 @@ async def verify_cow_by_nose(
         if query_emb is None:
             continue  # Skip this file if embedding extraction failed
         
-        # Use pgvector for efficient similarity search
+        # ROBUST VERIFICATION: Check against ALL embeddings for ALL cows
         from sqlalchemy import text
         
         # Convert embedding to string format for pgvector
         emb_str = '[' + ','.join(map(str, query_emb.tolist())) + ']'
         
-        # Find most similar embedding using pgvector
+        # Get ALL embeddings and their similarities - comprehensive search
         query = text("""
-            SELECT cow_id, (1 - (embedding <=> :query_emb)) as similarity
-            FROM embeddings 
-            ORDER BY embedding <=> :query_emb 
-            LIMIT 1
+            SELECT e.cow_id, c.cow_tag, (1 - (e.embedding <=> :query_emb)) as similarity,
+                   e.image_angle, e.quality_score, e.is_primary
+            FROM embeddings e
+            JOIN cows c ON e.cow_id = c.cow_id
+            ORDER BY e.embedding <=> :query_emb
         """)
         
-        result = db.execute(query, {"query_emb": emb_str}).fetchone()
+        all_results = db.execute(query, {"query_emb": emb_str}).fetchall()
         
-        best_similarity = result.similarity if result else 0
-        best_match = result.cow_id if result else None
+        if not all_results:
+            best_similarity = 0
+            best_match = None
+            print(f"❌ No embeddings found in database for comparison")
+        else:
+            # Find the absolute best match across ALL cows and ALL embeddings
+            best_result = all_results[0]  # Already ordered by similarity
+            best_similarity = best_result.similarity
+            best_match = best_result.cow_id
+            
+            print(f"🔍 VERIFICATION ANALYSIS for {f.filename}:")
+            print(f"   Total embeddings checked: {len(all_results)}")
+            print(f"   Best match: Cow {best_result.cow_tag} (ID: {best_match})")
+            print(f"   Best similarity: {best_similarity:.4f}")
+            print(f"   Embedding type: {best_result.image_angle}")
+            
+            # Show top 3 matches for transparency
+            print(f"   Top 3 matches:")
+            for i, r in enumerate(all_results[:3]):
+                print(f"     {i+1}. Cow {r.cow_tag}: {r.similarity:.4f} ({r.image_angle})")
         
-        # Adjusted threshold for practical use
-        if best_similarity > 0.85:
+        # ROBUST DECISION: Must exceed threshold for positive identification
+        VERIFICATION_THRESHOLD = 0.85
+        
+        if best_similarity > VERIFICATION_THRESHOLD:
             cow = db.query(Cow).filter(Cow.cow_id == best_match).first()
             
             # Send SMS alert to owner (disabled until Twilio configured)
@@ -75,25 +96,38 @@ async def verify_cow_by_nose(
             #         location="Mobile App Verification"
             #     )
             
+            print(f"✅ VERIFICATION SUCCESS: Cow {cow.cow_tag} identified with {best_similarity:.3f} confidence")
+            
             result = {
                 "file": f.filename,
-                "similarity": float(round(best_similarity, 3)),
+                "verification_status": "VERIFIED",
+                "similarity": float(round(best_similarity, 4)),
+                "confidence_level": "HIGH" if best_similarity > 0.92 else "MEDIUM",
                 "cow_found": True,
+                "total_embeddings_checked": len(all_results) if 'all_results' in locals() else 0,
                 "cow_details": {
                     "cow_id": cow.cow_id,
                     "cow_tag": cow.cow_tag,
                     "breed": cow.breed,
                     "color": cow.color,
-                    "owner_name": cow.owner.full_name if cow.owner else None
+                    "age": cow.age,
+                    "owner_name": cow.owner.full_name if cow.owner else None,
+                    "owner_phone": cow.owner.phone if cow.owner else None
                 },
                 "owner_notified": bool(cow.owner and cow.owner.phone)
             }
         else:
+            print(f"❌ VERIFICATION FAILED: No match found (best: {best_similarity:.3f}, threshold: {VERIFICATION_THRESHOLD})")
+            
             result = {
                 "file": f.filename,
-                "similarity": float(round(best_similarity, 3)),
+                "verification_status": "NOT_FOUND",
+                "similarity": float(round(best_similarity, 4)),
+                "confidence_level": "LOW",
                 "cow_found": False,
-                "message": "Cow not found in database"
+                "total_embeddings_checked": len(all_results) if 'all_results' in locals() else 0,
+                "threshold_used": VERIFICATION_THRESHOLD,
+                "message": f"No cow found with similarity above {VERIFICATION_THRESHOLD} threshold"
             }
         
         results.append(result)

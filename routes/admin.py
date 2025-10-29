@@ -62,8 +62,10 @@ async def admin_register_new_cow(
     if len(files) != REGISTRATION_CONFIG["min_images"]:
         raise HTTPException(status_code=400, detail=f"Exactly {REGISTRATION_CONFIG['min_images']} high-quality nose print images required")
 
-    # Check for duplicate registration using pgvector
+    # ROBUST DUPLICATE DETECTION: Check ALL embeddings for ALL cows
     from sqlalchemy import text
+    
+    print(f"\n🔍 DUPLICATE CHECK: Processing {len(files)} images for registration...")
     
     for idx, f in enumerate(files):
         contents = await f.read()
@@ -79,26 +81,43 @@ async def admin_register_new_cow(
             raise HTTPException(status_code=400, detail=f"Failed to extract embedding from {f.filename}")
         emb_str = '[' + ','.join(map(str, emb.tolist())) + ']'
         
-        # Check for duplicates using pgvector (much faster)
+        # COMPREHENSIVE duplicate check against ALL existing embeddings
         query = text("""
-            SELECT e.cow_id, c.cow_tag, o.full_name, (1 - (e.embedding <=> :query_emb)) as similarity
+            SELECT e.cow_id, c.cow_tag, o.full_name, (1 - (e.embedding <=> :query_emb)) as similarity,
+                   e.image_angle
             FROM embeddings e
             JOIN cows c ON e.cow_id = c.cow_id
             JOIN owners o ON c.owner_id = o.owner_id
-            WHERE (1 - (e.embedding <=> :query_emb)) > 0.93
             ORDER BY e.embedding <=> :query_emb
-            LIMIT 1
+            LIMIT 5
         """)
         
-        duplicate = db.execute(query, {"query_emb": emb_str}).fetchone()
+        top_matches = db.execute(query, {"query_emb": emb_str}).fetchall()
         
-        if duplicate:
-            raise HTTPException(
-                status_code=409, 
-                detail=f"🚫 COW ALREADY REGISTERED! This cow is already in the system as {duplicate.cow_tag} owned by {duplicate.full_name}. Similarity: {duplicate.similarity:.3f}"
-            )
+        if top_matches:
+            best_match = top_matches[0]
+            print(f"   Image {idx+1} ({f.filename}):")
+            print(f"     Best match: {best_match.cow_tag} - {best_match.similarity:.4f}")
+            
+            # Strict duplicate threshold for registration (higher than verification)
+            DUPLICATE_THRESHOLD = 0.93
+            
+            if best_match.similarity > DUPLICATE_THRESHOLD:
+                print(f"\n🚫 DUPLICATE DETECTED!")
+                print(f"   Similarity: {best_match.similarity:.4f} > {DUPLICATE_THRESHOLD}")
+                print(f"   Existing cow: {best_match.cow_tag}")
+                print(f"   Owner: {best_match.full_name}")
+                
+                raise HTTPException(
+                    status_code=409, 
+                    detail=f"🚫 COW ALREADY REGISTERED! This cow matches existing cow {best_match.cow_tag} owned by {best_match.full_name}. Similarity: {best_match.similarity:.4f} (threshold: {DUPLICATE_THRESHOLD})"
+                )
+        else:
+            print(f"   Image {idx+1} ({f.filename}): No existing embeddings to compare")
     
-    # Process nose print images if no duplicates found
+    # PROCESS AND STORE EMBEDDINGS: No duplicates found, proceed with registration
+    print(f"\n✅ NO DUPLICATES FOUND - Proceeding with registration")
+    
     embeddings_data = []
     for idx, f in enumerate(files):
         contents = await f.read()
@@ -107,13 +126,17 @@ async def admin_register_new_cow(
         if emb is None:
             raise HTTPException(status_code=400, detail=f"Failed to extract embedding from {f.filename}")
         
+        print(f"   Storing embedding {idx+1}: {f.filename} -> {REQUIRED_ANGLES[idx]}")
+        
         embeddings_data.append({
             "embedding": emb.tolist(),
             "angle": REQUIRED_ANGLES[idx],
-            "quality_score": 0.8,
+            "quality_score": 0.85,  # Higher quality score for new system
             "is_primary": "yes" if idx == 0 else "no",
             "image_path": f.filename
         })
+    
+    print(f"   Total embeddings to store: {len(embeddings_data)}")
     
     # Create cow record
     cow = Cow(
@@ -179,14 +202,23 @@ async def admin_register_new_cow(
         if owner.email:
             background_tasks.add_task(main.send_registration_email, owner.email, owner.full_name, cow, pdf_path)
 
+    print(f"\n🎉 REGISTRATION COMPLETE:")
+    print(f"   Cow ID: {cow.cow_id}")
+    print(f"   Cow Tag: {cow_tag}")
+    print(f"   Owner: {owner.full_name}")
+    print(f"   Embeddings stored: {len(embeddings_data)}")
+    
     return {
         "success": True,
+        "registration_status": "COMPLETED",
         "owner_id": owner.owner_id,
         "owner_name": owner.full_name,
         "cow_id": cow.cow_id,
         "cow_tag": cow_tag,
-        "message": "Cow and owner registered successfully",
+        "message": "Cow and owner registered successfully with comprehensive duplicate checking",
         "nose_prints_processed": len(embeddings_data),
+        "embeddings_stored": len(embeddings_data),
+        "duplicate_check_passed": True,
         "qr_code_generated": bool(cow.qr_code_path),
         "receipt_generated": bool(cow.receipt_pdf_path),
         "email_sent": bool(owner.email)
@@ -479,27 +511,39 @@ async def admin_verify_cow_by_nose(
         if query_emb is None:
             continue  # Skip this file if embedding extraction failed
         
-        # Use pgvector for efficient similarity search
+        # ROBUST ADMIN VERIFICATION: Check against ALL embeddings
         from sqlalchemy import text
         
         # Convert embedding to string format for pgvector
         emb_str = '[' + ','.join(map(str, query_emb.tolist())) + ']'
         
-        # Find most similar embedding using pgvector cosine similarity
+        # Comprehensive search across ALL embeddings
         query = text("""
-            SELECT cow_id, (1 - (embedding <=> :query_emb)) as similarity
-            FROM embeddings 
-            ORDER BY embedding <=> :query_emb 
-            LIMIT 1
+            SELECT e.cow_id, c.cow_tag, (1 - (e.embedding <=> :query_emb)) as similarity,
+                   e.image_angle, e.quality_score
+            FROM embeddings e
+            JOIN cows c ON e.cow_id = c.cow_id
+            ORDER BY e.embedding <=> :query_emb
         """)
         
-        result = db.execute(query, {"query_emb": emb_str}).fetchone()
+        all_results = db.execute(query, {"query_emb": emb_str}).fetchall()
         
-        best_similarity = result.similarity if result else 0
-        best_cow_id = result.cow_id if result else None
+        if not all_results:
+            best_similarity = 0
+            best_cow_id = None
+        else:
+            best_result = all_results[0]
+            best_similarity = best_result.similarity
+            best_cow_id = best_result.cow_id
+            
+            print(f"🔍 ADMIN VERIFICATION - {f.filename}:")
+            print(f"   Embeddings checked: {len(all_results)}")
+            print(f"   Best: {best_result.cow_tag} - {best_similarity:.4f}")
         
-        # Require high similarity for verification (85%+)
-        if best_similarity > 0.85:  # Practical threshold for real-world use
+        # ADMIN VERIFICATION THRESHOLD
+        ADMIN_THRESHOLD = 0.85
+        
+        if best_similarity > ADMIN_THRESHOLD:
             cow = db.query(Cow).filter(Cow.cow_id == best_cow_id).first()
             verified_status = "yes" if best_similarity > 0.90 else "partial"
             
