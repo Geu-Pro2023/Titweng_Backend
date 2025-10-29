@@ -58,6 +58,6 @@ jobs:
           app-name: 'titweng-app'
           slot-name: 'Production'
           publish-profile: ${{ secrets.AZUREAPPSERVICE_PUBLISHPROFILE_77BB1540D06A42A18C73758068D150FF }}
-          package: '.'
+          type: 'git'
           clean: true
           restart: true
