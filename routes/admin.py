@@ -594,7 +594,7 @@ async def admin_verify_cow_by_nose(
                     "breed": cow.breed,
                     "color": cow.color,
                     "owner_name": cow.owner.full_name if cow.owner else None,
-                    "facial_image_url": f"/{cow.facial_image_path}" if cow.facial_image_path else None
+                    "facial_image_url": f"/{cow.facial_image_path}" if cow.facial_image_path and not cow.facial_image_path.startswith('/') else cow.facial_image_path
                 },
                 "owner_notified": owner_notified
             }
