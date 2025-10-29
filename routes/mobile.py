@@ -144,7 +144,7 @@ async def verify_cow_by_nose(
                     "age": cow.age,
                     "owner_name": cow.owner.full_name if cow.owner else None,
                     "owner_phone": cow.owner.phone if cow.owner else None,
-                    "facial_image_url": f"/{cow.facial_image_path}" if cow.facial_image_path and not cow.facial_image_path.startswith('/') else cow.facial_image_path
+                    "facial_image_url": f"/{cow.facial_image_path}" if cow.facial_image_path else None
                 },
                 "owner_notified": owner_notified
             }
@@ -343,7 +343,7 @@ async def verify_cow_live_camera(
                 "breed": cow.breed,
                 "color": cow.color,
                 "owner_name": cow.owner.full_name if cow.owner else None,
-                "facial_image_url": f"/{cow.facial_image_path}" if cow.facial_image_path and not cow.facial_image_path.startswith('/') else cow.facial_image_path
+                "facial_image_url": f"/{cow.facial_image_path}" if cow.facial_image_path else None
             }
         }
     else:
