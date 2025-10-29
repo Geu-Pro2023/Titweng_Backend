@@ -86,6 +86,36 @@ async def verify_cow_by_nose(
         VERIFICATION_THRESHOLD = 0.85
         
         if best_similarity > VERIFICATION_THRESHOLD:
+            # CHECK FOR AMBIGUOUS MATCHES (multiple cows with high similarity)
+            high_matches = [r for r in all_results if r.similarity > VERIFICATION_THRESHOLD]
+            
+            if len(high_matches) > 1:
+                # Check if there are multiple different cows above threshold
+                unique_cows = set(r.cow_id for r in high_matches)
+                if len(unique_cows) > 1:
+                    print(f"⚠️ AMBIGUOUS MATCH DETECTED:")
+                    for i, r in enumerate(high_matches[:3]):
+                        print(f"   {i+1}. Cow {r.cow_tag}: {r.similarity:.4f}")
+                    
+                    # If top match is significantly better, proceed
+                    if best_similarity - high_matches[1].similarity > 0.05:  # 5% gap
+                        print(f"✅ Clear winner: {best_similarity:.4f} vs {high_matches[1].similarity:.4f}")
+                    else:
+                        print(f"❌ Too close to call: {best_similarity:.4f} vs {high_matches[1].similarity:.4f}")
+                        result = {
+                            "file": f.filename,
+                            "verification_status": "AMBIGUOUS",
+                            "similarity": float(round(best_similarity, 4)),
+                            "cow_found": False,
+                            "message": f"Multiple cows found with similar scores. Manual verification required.",
+                            "ambiguous_matches": [
+                                {"cow_tag": r.cow_tag, "similarity": round(r.similarity, 4)} 
+                                for r in high_matches[:3] if r.cow_id in unique_cows
+                            ]
+                        }
+                        results.append(result)
+                        continue
+            
             cow = db.query(Cow).filter(Cow.cow_id == best_match).first()
             
             # Send SMS alert to owner (disabled until Twilio configured)
