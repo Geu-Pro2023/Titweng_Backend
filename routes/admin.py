@@ -13,6 +13,7 @@ from models import Cow, Embedding, Owner, VerificationLog, Report
 from auth import get_current_admin
 from utils import generate_qr_code, generate_receipt_pdf, generate_transfer_receipt_pdf, QR_AVAILABLE
 from cow_tag_generator import generate_secure_cow_tag
+from sms_service import send_verification_alert_sms
 
 router = APIRouter(
     prefix="/admin",
