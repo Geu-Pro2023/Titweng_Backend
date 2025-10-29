@@ -19,8 +19,8 @@ router = APIRouter(
     tags=["Admin Dashboard"]
 )
 
-REGISTRATION_CONFIG = {"min_images": 5, "max_images": 5}
-REQUIRED_ANGLES = ["front", "left", "right", "top", "front2"]
+REGISTRATION_CONFIG = {"min_images": 3, "max_images": 3}
+REQUIRED_ANGLES = ["image1", "image2", "image3"]
 
 # ---------------------------
 # 1. Register New Cow (Owner + Cow Combined)
@@ -60,7 +60,7 @@ async def admin_register_new_cow(
 
     # Validate nose print images
     if len(files) != REGISTRATION_CONFIG["min_images"]:
-        raise HTTPException(status_code=400, detail=f"Exactly {REGISTRATION_CONFIG['min_images']} nose print images required")
+        raise HTTPException(status_code=400, detail=f"Exactly {REGISTRATION_CONFIG['min_images']} high-quality nose print images required")
 
     # Check for duplicate registration using pgvector
     from sqlalchemy import text
@@ -501,7 +501,7 @@ async def admin_verify_cow_by_nose(
         # Require high similarity for verification (85%+)
         if best_similarity > 0.85:  # Practical threshold for real-world use
             cow = db.query(Cow).filter(Cow.cow_id == best_cow_id).first()
-            verified_status = "yes" if best_similarity > 0.97 else "partial"
+            verified_status = "yes" if best_similarity > 0.90 else "partial"
             
             # Log verification
             log = VerificationLog(

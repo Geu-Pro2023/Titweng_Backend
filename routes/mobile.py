@@ -251,8 +251,8 @@ async def verify_cow_live_camera(
     best_similarity = result.similarity if result else 0
     best_cow_id = result.cow_id if result else None
     
-    # Ultra-strict threshold for 100k+ scale
-    if best_similarity > 0.95:
+    # Adjusted threshold for practical use
+    if best_similarity > 0.85:
         cow = db.query(Cow).filter(Cow.cow_id == best_cow_id).first()
         
         # Send SMS alert to owner (disabled until Twilio configured)
