@@ -38,10 +38,10 @@ async def admin_register_new_cow(
     breed: str = Form(...),
     color: str = Form(...),
     age: int = Form(...),
-    # Nose Print Images (3 required)
-    files: List[UploadFile] = File(...),
-    # Cow Facial Image (1 required)
-    facial_image: UploadFile = File(...),
+    # Nose Print Images (exactly 3 required)
+    nose_print_files: List[UploadFile] = File(..., description="Upload exactly 3 nose print images"),
+    # Cow Facial Image (exactly 1 required)  
+    facial_image_file: UploadFile = File(..., description="Upload 1 cow facial image for verification"),
     db: Session = Depends(get_db),
     current_admin=Depends(get_current_admin)
 ):
@@ -61,15 +61,15 @@ async def admin_register_new_cow(
     cow_tag = generate_secure_cow_tag(db, owner.owner_id)
 
     # Validate nose print images
-    if len(files) != REGISTRATION_CONFIG["min_images"]:
+    if len(nose_print_files) != REGISTRATION_CONFIG["min_images"]:
         raise HTTPException(status_code=400, detail=f"Exactly {REGISTRATION_CONFIG['min_images']} high-quality nose print images required")
 
     # ROBUST DUPLICATE DETECTION: Check ALL embeddings for ALL cows
     from sqlalchemy import text
     
-    print(f"\n🔍 DUPLICATE CHECK: Processing {len(files)} images for registration...")
+    print(f"\n🔍 DUPLICATE CHECK: Processing {len(nose_print_files)} images for registration...")
     
-    for idx, f in enumerate(files):
+    for idx, f in enumerate(nose_print_files):
         contents = await f.read()
             
         # Detect nose using HF API
@@ -121,7 +121,7 @@ async def admin_register_new_cow(
     print(f"\n✅ NO DUPLICATES FOUND - Proceeding with registration")
     
     embeddings_data = []
-    for idx, f in enumerate(files):
+    for idx, f in enumerate(nose_print_files):
         f.file.seek(0)  # Reset file pointer
         contents = await f.read()
         nose_result = main.detect_nose(contents)
@@ -156,7 +156,7 @@ async def admin_register_new_cow(
     
     # Process and save facial image with watermark
     from image_utils import save_facial_image
-    facial_contents = await facial_image.read()
+    facial_contents = await facial_image_file.read()
     facial_path = save_facial_image(facial_contents, cow.cow_id, cow_tag)
     
     if facial_path:
