@@ -120,6 +120,7 @@ async def admin_register_new_cow(
     
     embeddings_data = []
     for idx, f in enumerate(files):
+        f.file.seek(0)  # Reset file pointer
         contents = await f.read()
         nose_result = main.detect_nose(contents)
         emb = main.extract_embedding(contents)
