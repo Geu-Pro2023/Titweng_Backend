@@ -1,4 +1,4 @@
-# sms_service.py - Twilio SMS notifications
+# sms_service.py - Brevo SMS notifications
 import os
 from datetime import datetime
 from dotenv import load_dotenv
@@ -6,42 +6,50 @@ from dotenv import load_dotenv
 load_dotenv()
 
 def send_verification_alert_sms(owner_phone: str, cow_tag: str, location: str = None):
-    """Send SMS alert to owner when their cow is being verified"""
+    """Send SMS alert to owner when their cow is being verified via Brevo API"""
     try:
-        from twilio.rest import Client
+        import requests
         
-        # Twilio configuration
-        account_sid = os.getenv("TWILIO_ACCOUNT_SID")
-        auth_token = os.getenv("TWILIO_AUTH_TOKEN")
-        twilio_phone = os.getenv("TWILIO_PHONE_NUMBER")
-        titweng_contact = os.getenv("TITWENG_CONTACT_NUMBER")
+        # Brevo configuration
+        brevo_api_key = os.getenv("BREVO_API_KEY")
+        sms_sender = os.getenv("BREVO_SMS_SENDER", "Titweng")
+        titweng_contact = os.getenv("TITWENG_CONTACT_NUMBER", "+250792104851")
         
-        if not all([account_sid, auth_token, twilio_phone]) or account_sid == "your_twilio_account_sid":
-            print("❌ Twilio credentials not configured properly")
+        if not brevo_api_key:
+            print("❌ Brevo API key not configured")
             return False
-        
-        client = Client(account_sid, auth_token)
         
         # Format phone number
         if not owner_phone.startswith('+'):
             owner_phone = f"+{owner_phone}"
         
-        # Create message
-        location_text = f" at {location}" if location else ""
-        message_body = f"Hello, your cow {cow_tag} is being verified right now{location_text}. If this is you, ignore this message. If NOT you, call Titweng: +250792104851 for help."
+        # Professional message
+        message_body = f"Titweng Security: Your registered cow {cow_tag} is currently being verified. If you did not request this verification, please contact our support team at {titweng_contact}."
         
-        # Send SMS
-        message = client.messages.create(
-            body=message_body,
-            from_=twilio_phone,
-            to=owner_phone
-        )
+        # Send SMS via Brevo API
+        url = "https://api.brevo.com/v3/transactionalSMS/sms"
+        headers = {
+            "api-key": brevo_api_key,
+            "Content-Type": "application/json"
+        }
         
-        print(f"✅ SMS sent to {owner_phone} for cow {cow_tag}")
-        return True
+        data = {
+            "sender": sms_sender,
+            "recipient": owner_phone,
+            "content": message_body
+        }
+        
+        response = requests.post(url, json=data, headers=headers, timeout=30)
+        
+        if response.status_code == 201:
+            print(f"✅ SMS sent via Brevo to {owner_phone} for cow {cow_tag}")
+            return True
+        else:
+            print(f"❌ Brevo SMS API error: {response.status_code} - {response.text}")
+            return False
         
     except Exception as e:
-        print(f"❌ Failed to send SMS: {e}")
+        print(f"❌ Failed to send SMS via Brevo: {e}")
         return False
 
 def send_suspicious_activity_sms(owner_phone: str, cow_tag: str, details: str):

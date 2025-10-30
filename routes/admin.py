@@ -593,14 +593,8 @@ async def admin_verify_cow_by_nose(
             cow = db.query(Cow).filter(Cow.cow_id == best_cow_id).first()
             verified_status = "yes" if best_similarity > 0.90 else "partial"
             
-            # Send SMS alert to owner
+            # No SMS for admin verification - owner usually present
             owner_notified = False
-            if cow.owner and cow.owner.phone:
-                owner_notified = send_verification_alert_sms(
-                    owner_phone=cow.owner.phone,
-                    cow_tag=cow.cow_tag,
-                    location=location or "Admin Dashboard"
-                )
             
             # Log verification
             log = VerificationLog(

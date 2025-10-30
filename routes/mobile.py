@@ -183,14 +183,14 @@ def verify_cow_by_tag(
     if cow.ownership_status == "transferred":
         ownership_message = "⚠️ OWNERSHIP TRANSFERRED: This cow's ownership has been transferred. Please contact Titweng Team for full details."
     
-    # Send SMS alert to owner (disabled until Twilio configured)
+    # Send SMS alert to owner
     owner_notified = False
-    # if cow.owner and cow.owner.phone:
-    #     owner_notified = send_verification_alert_sms(
-    #         owner_phone=cow.owner.phone,
-    #         cow_tag=cow.cow_tag,
-    #         location="Tag Scan Verification"
-    #     )
+    if cow.owner and cow.owner.phone:
+        owner_notified = send_verification_alert_sms(
+            owner_phone=cow.owner.phone,
+            cow_tag=cow.cow_tag,
+            location="Tag Scan Verification"
+        )
     
     return {
         "cow_found": True,
