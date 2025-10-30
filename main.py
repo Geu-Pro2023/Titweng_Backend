@@ -21,7 +21,7 @@ from contextlib import asynccontextmanager
 
 # Database & Auth
 from database import get_db
-from models import Cow, Owner, Embedding, User, VerificationLog
+from models import Cow, Owner, Embedding, User, VerificationLog, Report
 from auth import create_access_token, get_current_user, get_current_admin
 
 # Optional libraries
@@ -514,6 +514,59 @@ def get_cow_face_by_tag(
         "owner_name": cow.owner.full_name if cow.owner else None,
         "registration_date": cow.registration_date.strftime('%Y-%m-%d'),
         "ownership_status": cow.ownership_status
+    }
+
+# ---------------------------
+# Delete Cow by Tag (Admin)
+# ---------------------------
+@app.delete("/cow/{cow_tag}/delete", summary="Delete cow by tag with all related data")
+def delete_cow_by_tag(
+    cow_tag: str,
+    db: Session = Depends(get_db),
+    current_admin=Depends(get_current_admin)
+):
+    """Admin endpoint to delete cow and all related data by cow tag"""
+    from models import VerificationLog
+    
+    cow = db.query(Cow).filter(Cow.cow_tag == cow_tag).first()
+    if not cow:
+        raise HTTPException(status_code=404, detail="Cow tag not found")
+    
+    # Get owner for deletion
+    owner = cow.owner
+    
+    # Delete all verification logs for this cow
+    db.query(VerificationLog).filter(VerificationLog.cow_id == cow.cow_id).delete()
+    
+    # Delete physical files
+    files_deleted = []
+    if cow.qr_code_path and os.path.exists(cow.qr_code_path):
+        os.remove(cow.qr_code_path)
+        files_deleted.append("QR code")
+    if cow.receipt_pdf_path and os.path.exists(cow.receipt_pdf_path):
+        os.remove(cow.receipt_pdf_path)
+        files_deleted.append("Receipt PDF")
+    if cow.transfer_receipt_path and os.path.exists(cow.transfer_receipt_path):
+        os.remove(cow.transfer_receipt_path)
+        files_deleted.append("Transfer receipt")
+    if cow.facial_image_path and os.path.exists(cow.facial_image_path):
+        os.remove(cow.facial_image_path)
+        files_deleted.append("Facial image")
+    
+    # Delete cow (embeddings will cascade delete automatically)
+    db.delete(cow)
+    
+    # Delete owner (since each cow has its own owner record)
+    if owner:
+        db.delete(owner)
+    
+    db.commit()
+    
+    return {
+        "success": True, 
+        "message": f"Cow {cow_tag}, owner, and all related data deleted successfully",
+        "files_deleted": files_deleted,
+        "deleted_items": ["Cow record", "Owner record", "Embeddings", "Verification logs"] + files_deleted
     }
 
 # ---------------------------

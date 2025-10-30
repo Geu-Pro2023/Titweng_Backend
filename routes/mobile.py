@@ -246,6 +246,52 @@ def submit_report(
     }
 
 # ---------------------------
+# 6. Submit Report with GPS Location
+# ---------------------------
+@router.post("/report/gps", summary="Submit report with GPS coordinates")
+def submit_report_with_gps(
+    reporter_name: str = Form(...),
+    reporter_phone: str = Form(...),
+    reporter_email: str = Form(None),
+    cow_tag: str = Form(None),
+    report_type: str = Form(...),  # suspect, theft, other
+    subject: str = Form(...),
+    message: str = Form(...),
+    latitude: float = Form(..., description="GPS latitude coordinate"),
+    longitude: float = Form(..., description="GPS longitude coordinate"),
+    db: Session = Depends(get_db)
+):
+    """Submit report with precise GPS coordinates from mobile app"""
+    
+    # Format GPS coordinates as location string
+    gps_location = f"{latitude:.6f}° N, {longitude:.6f}° E"
+    
+    report = Report(
+        reporter_name=reporter_name,
+        reporter_phone=reporter_phone,
+        reporter_email=reporter_email,
+        cow_tag=cow_tag,
+        report_type=report_type,
+        subject=subject,
+        message=message,
+        location=gps_location
+    )
+    db.add(report)
+    db.commit()
+    db.refresh(report)
+    
+    return {
+        "success": True,
+        "report_id": report.report_id,
+        "message": "Report with GPS location submitted successfully",
+        "gps_coordinates": {
+            "latitude": latitude,
+            "longitude": longitude,
+            "formatted_location": gps_location
+        }
+    }
+
+# ---------------------------
 # 4. Get Report Status
 # ---------------------------
 @router.get("/report/{report_id}", summary="Get report status")
