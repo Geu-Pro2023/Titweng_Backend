@@ -493,6 +493,30 @@ async def test_ml_models(
         }
 
 # ---------------------------
+# Public Cow Face Lookup
+# ---------------------------
+@app.get("/cow/{cow_tag}/face", summary="Get cow facial image by tag")
+def get_cow_face_by_tag(
+    cow_tag: str,
+    db: Session = Depends(get_db)
+):
+    """Public endpoint to get cow facial image and basic details by tag"""
+    cow = db.query(Cow).filter(Cow.cow_tag == cow_tag).first()
+    if not cow:
+        raise HTTPException(status_code=404, detail="Cow tag not found")
+    
+    return {
+        "cow_tag": cow.cow_tag,
+        "facial_image_url": f"/{cow.facial_image_path}" if cow.facial_image_path else None,
+        "breed": cow.breed,
+        "color": cow.color,
+        "age": cow.age,
+        "owner_name": cow.owner.full_name if cow.owner else None,
+        "registration_date": cow.registration_date.strftime('%Y-%m-%d'),
+        "ownership_status": cow.ownership_status
+    }
+
+# ---------------------------
 # Health Check
 # ---------------------------
 @app.get("/health")
