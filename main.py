@@ -70,6 +70,7 @@ from ml_client_local import ml_client
 async def lifespan(app: FastAPI):
     os.makedirs("static/qrcodes", exist_ok=True)
     os.makedirs("static/receipts", exist_ok=True)
+    os.makedirs("static/cow_faces", exist_ok=True)
     os.makedirs("logs", exist_ok=True)
     
     # Create tables and admin user on startup
@@ -147,15 +148,15 @@ app.add_middleware(
     allow_headers=["*"]
 )
 
+# Mount static files for serving images
+app.mount("/static", StaticFiles(directory="static"), name="static")
+
 # ---------------------------
 # Include Routers
 # ---------------------------
 from routes import mobile, admin
 app.include_router(mobile.router)
 app.include_router(admin.router)
-
-# Mount static files for serving images
-app.mount("/static", StaticFiles(directory="static"), name="static")
 
 # ---------------------------
 # ML Utilities
